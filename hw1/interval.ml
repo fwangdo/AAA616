@@ -170,26 +170,32 @@ end
   2. when you meet "While", also you need to make two "skips" however, the before one is for both(loop and termition) and the latter one is just for termination
   3. in while, skip node, that is starting point, need to point two assume inst. in other case, pointing(using edge) is trivial.
   
- sp, ep means starting point and end point
+ sp, ep means loop point and end point
+ pr means pred
 *)
 
 let rec cmd2cfg : cmd -> Cfg.t 
 = fun cmd -> let init = Cfg.empty in 
   let Seq(lst) = cmd in 
-  let sp' = Node.create_skip() in let ep' = Node.create_skip() in Cfg.add_edge sp' ep' (parsing lst init sp' ep')
-and parsing : cmd list -> Cfg.t -> Node.t -> Node.t -> Cfg.t   
-= fun smt cfg sp ep -> match smt with
+  let sp' = Node.create_skip() in let ep' = Node.create_skip() in (parsing lst init sp' ep' sp' false) 
+and parsing : cmd list -> Cfg.t -> Node.t -> Node.t -> Node.t -> bool -> Cfg.t   
+= fun smt cfg lp ep pr loop -> match smt with
  | hd::tl -> begin match hd with 
-    | Assign (s1, a2)      -> Cfg.add_edge sp (Node.create_assign s1 a2) (parsing tl cfg sp ep)
+    | Assign (s1, a2)      -> let cur = Node.create_assign s1 a2 in Cfg.add_edge pr cur (parsing tl cfg lp ep cur loop)
     | Seq    (l1)          -> let sp' = Node.create_skip() in let ep' = Node.create_skip() in  
-                              Cfg.add_edge sp' ep' (parsing tl cfg sp' ep')
+                              let cfg' = Cfg.add_edge pr sp' cfg in parsing l1 cfg' lp ep' sp' loop 
     | If     (b1, c2, c3)  -> cfg (*we do not have to handle this case*)
     | While  (b1, c2)      -> let sp' = Node.create_skip() in let ep' = Node.create_skip() in
                               let pass = Node.create_assume b1 in let term = Node.create_assume(Not (b1)) in  
-                              let cfg' = Cfg.add_edge sp' pass (parsing tl cfg sp' ep) in 
-                              let cfg'' = Cfg.add_edge sp' term (parsing tl cfg' sp ep') in cfg''
+                              let cfg = Cfg.add_edge pr sp' cfg in (* connect 4 to 5*)
+                              let cfg' = Cfg.add_edge sp' pass cfg in 
+                              let cfg'' = (parsing [c2] cfg' sp' ep pass true) in 
+                              let cfg''' = Cfg.add_edge sp' term cfg'' in
+                              let cfg'''' = (parsing tl cfg''' lp ep' term loop) in 
+                              Cfg.add_edge ep' ep cfg'''' 
+                              
   end
-  | _ -> cfg
+  | _ -> let cfg' = Cfg.add_edge pr ep cfg in if loop then Cfg.add_edge ep lp cfg' else cfg'
 (****)
 
 module type AbsBool = sig
