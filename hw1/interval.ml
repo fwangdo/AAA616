@@ -93,25 +93,30 @@ module type Cfg = sig
 end 
 
 module Cfg : Cfg = struct
+  (* cfg itself is one structure that consists of diverse nodes. *)
   type t = { 
     nodes : NodeSet.t; 
-    succs : NodeSet.t NodeMap.t; 
+    succs : NodeSet.t NodeMap.t; (* mapping from current node to succeding node. *) 
     preds : NodeSet.t NodeMap.t }
   let empty = { 
     nodes = NodeSet.empty; 
     succs = NodeMap.empty; 
     preds = NodeMap.empty }
 
+  (* return nodes *)
   let nodesof : t -> Node.t list 
   =fun t -> NodeSet.elements t.nodes
 
+  (* return succ of input node *)
   let succs : Node.t -> t -> NodeSet.t
   =fun n g -> try NodeMap.find n g.succs with _ -> NodeSet.empty
 
+  (**)
   let preds : Node.t -> t -> NodeSet.t
   =fun n g -> try NodeMap.find n g.preds with _ -> NodeSet.empty
 
   let add_node : Node.t -> t -> t
+  (* with means updating nodes only*)
   =fun n g -> { g with nodes = NodeSet.add n g.nodes }
 
   let add_nodes : Node.t list -> t -> t
@@ -122,6 +127,7 @@ module Cfg : Cfg = struct
   =fun n1 n2 g -> 
     g 
     |> add_nodes [n1;n2] 
+    (* it means n1 -> Succ of n1 Set(n2, ...) *)
     |> (fun g -> { g with 
           succs = NodeMap.add n1 (NodeSet.add n2 (succs n1 g)) g.succs }) 
     |> (fun g -> { g with 
@@ -157,9 +163,34 @@ module Cfg : Cfg = struct
     print_endline "}"
 end
 
+(* 
+  Challenge 1.
 
-let cmd2cfg : cmd -> Cfg.t 
-=fun cmd -> Cfg.empty (* TODO *)
+  1. when you meet "Seq", you need to make two "skip"s, the before one is starting point, the after one is end point.   
+  2. when you meet "While", also you need to make two "skips" however, the before one is for both(loop and termition) and the latter one is just for termination
+  3. in while, skip node, that is starting point, need to point two assume inst. in other case, pointing(using edge) is trivial.
+  
+ sp, ep means starting point and end point
+*)
+
+let rec cmd2cfg : cmd -> Cfg.t 
+= fun cmd -> let init = Cfg.empty in 
+  let Seq(lst) = cmd in 
+  let sp' = Node.create_skip() in let ep' = Node.create_skip() in Cfg.add_edge sp' ep' (parsing lst init sp' ep')
+and parsing : cmd list -> Cfg.t -> Node.t -> Node.t -> Cfg.t   
+= fun smt cfg sp ep -> match smt with
+ | hd::tl -> begin match hd with 
+    | Assign (s1, a2)      -> Cfg.add_edge sp (Node.create_assign s1 a2) (parsing tl cfg sp ep)
+    | Seq    (l1)          -> let sp' = Node.create_skip() in let ep' = Node.create_skip() in  
+                              Cfg.add_edge sp' ep' (parsing tl cfg sp' ep')
+    | If     (b1, c2, c3)  -> cfg (*we do not have to handle this case*)
+    | While  (b1, c2)      -> let sp' = Node.create_skip() in let ep' = Node.create_skip() in
+                              let pass = Node.create_assume b1 in let term = Node.create_assume(Not (b1)) in  
+                              let cfg' = Cfg.add_edge sp' pass (parsing tl cfg sp' ep) in 
+                              let cfg'' = Cfg.add_edge sp' term (parsing tl cfg' sp ep') in cfg''
+  end
+  | _ -> cfg
+(****)
 
 module type AbsBool = sig
   type t = Top |  Bot | True | False 
@@ -265,6 +296,7 @@ end
 let analyze : Cfg.t -> Table.t
 =fun g -> Table.empty (* TODO *)
 
+
 let pgm = 
   Seq [
     Assign ("x", Const 0); 
@@ -276,6 +308,8 @@ let pgm =
       ]);
   ]
 
-let cfg = cmd2cfg pgm
-let table = analyze cfg 
-let _ = Table.print table
+let cfg = cmd2cfg pgm 
+let _ = Cfg.print cfg
+let _ = Cfg.dot cfg
+(* let table = analyze cfg 
+let _ = Table.print table *)
