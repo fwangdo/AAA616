@@ -170,7 +170,7 @@ end
   2. when you meet "While", also you need to make two "skips" however, the before one is for both(loop and termition) and the latter one is just for termination
   3. in while, skip node, that is starting point, need to point two assume inst. in other case, pointing(using edge) is trivial.
   
- sp, ep means loop point and end point
+ lp, ep means loop point and end point
  pr means pred
 *)
 
@@ -193,21 +193,32 @@ and parsing : cmd list -> Cfg.t -> Node.t -> Node.t -> Node.t -> bool -> Cfg.t
                               let cfg''' = Cfg.add_edge sp' term cfg'' in
                               let cfg'''' = (parsing tl cfg''' lp ep' term loop) in 
                               Cfg.add_edge ep' ep cfg'''' 
-                              
   end
   | _ -> let cfg' = Cfg.add_edge pr ep cfg in if loop then Cfg.add_edge ep lp cfg' else cfg'
 (****)
 
 module type AbsBool = sig
-  type t = Top |  Bot | True | False 
+  type t = Top | Bot | True | False 
   val not : t -> t 
   val band : t -> t -> t
 end
 
 module AbsBool : AbsBool = struct
   type t = Top | Bot | True | False
-  let not b = b (* TODO *)
-  let band b1 b2 = b1 (* TODO *)
+  let not : t -> t
+  = fun b -> match b with 
+    | True -> False 
+    | False -> True
+    | _ -> b
+  let band : t -> t
+  = fun b1 b2 -> match b1, b2 with 
+    | Bot, _ -> Bot 
+    | _, Bot -> Bot 
+    | False, _ -> False
+    | _, False -> False 
+    | Top, _ -> Top
+    | _, Top -> Top
+    | True, True -> True (* it is the other case.*)
 end
 
 module type Interval = sig
@@ -231,10 +242,27 @@ module type Interval = sig
 end
 
 module Interval : Interval = struct
-  type t = Bot (* TODO *)
+  type t = Bot | Top | Interval of int * int 
   let bottom = Bot 
-  let to_string i = "" (* TODO *)
-  let alpha n = Bot (* TODO *)
+
+  let to_string: t -> string 
+  = fun i -> match i with 
+    | Bot -> "Bottom" 
+    | Top -> "Top"
+    | Interval(i1, i2) -> let str_i1 = string_of_int i1 in let str_i2 = string_of_int i2 in "[" ^ str_i1 ^ ", " ^ str_i2 ^ "]"
+
+  let alpha_a: aexp -> aexp
+  = fun a -> match a with 
+    | Const(i1)
+    | Var(s1)
+    | Plus(a1,a2)
+    | Mult(a1,a2)
+    | Sub(a1,a2)
+
+  (* I guess this function is for abstracting concrete values. *)
+  let alpha: -> t 
+  = fun n -> 
+
   let alpha_to n = Bot (* TODO *)
   let alpha_from n = Bot (* TODO *)
   let order a b = true (* TODO *)
@@ -245,8 +273,12 @@ module Interval : Interval = struct
   let add a b = a (* TODO *)
   let mul a b = a (* TODO *)
   let sub a b = a (* TODO *)
-  let equal a b = AbsBool.Top (* TODO *)
+
+  let equal 
+    a b = AbsBool.Top (* TODO *)
+
   let le a b = AbsBool.Top (* TODO *)
+
   let ge a b = AbsBool.Top (* TODO *)
 end
 
