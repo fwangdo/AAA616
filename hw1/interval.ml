@@ -242,7 +242,10 @@ module type Interval = sig
 end
 
 module Interval : Interval = struct
-  type t = Bot | Top | Interval of int * int 
+(* N_inf means negative infinite, P_int means postiive negative.*)
+  type atom = int | N_inf | P_inf 
+  type t = Bot | Top | Interval of atom * atom  
+
   let bottom = Bot 
 
   let to_string: t -> string 
@@ -251,25 +254,79 @@ module Interval : Interval = struct
     | Top -> "Top"
     | Interval(i1, i2) -> let str_i1 = string_of_int i1 in let str_i2 = string_of_int i2 in "[" ^ str_i1 ^ ", " ^ str_i2 ^ "]"
 
-  let alpha_a: aexp -> aexp
-  = fun a -> match a with 
-    | Const(i1)
-    | Var(s1)
-    | Plus(a1,a2)
-    | Mult(a1,a2)
-    | Sub(a1,a2)
-
   (* I guess this function is for abstracting concrete values. *)
-  let alpha: -> t 
-  = fun n -> 
+  let alpha: int -> t 
+  = fun n -> Interval(n, n)  
 
-  let alpha_to n = Bot (* TODO *)
-  let alpha_from n = Bot (* TODO *)
-  let order a b = true (* TODO *)
-  let join a b = a (* TODO *)
-  let meet a b = a (* TODO *)
-  let widen a b = a (* TODO *)
-  let narrow a b = a (* TODO *)
+  (* (-inf, n) *)
+  let alpha_to: int -> t 
+  = fun n -> Interval(N_inf, n)
+
+  (* (n, inf) *)
+  let alpha_from: int -> t
+  = fun n -> Interval(n, P_inf)
+
+  (* order for atom. only if something located in right is greater than left one, then return value would be true*)
+  let comp: atom -> atom -> bool 
+  = fun a b -> match a, b with 
+    | _, P_inf = true
+    | P_inf, _ = false 
+    | N_inf, _ = true 
+    | _, N_inf = false 
+    | x, y     = if x <= y then true else false 
+
+  let order: t -> t -> bool 
+  = fun a b -> match (a,b) with 
+    | Bot, _ -> true 
+    | _, Bot -> false
+    | _, Top -> true
+    | Top, _ -> false  
+    (* interval cases. thinks about inf cases frist!*)
+    | Interval(a1, a2), Interval(b1, b2) -> if (comp b1 a1) && (comp a2 b2) then true else false 
+
+  let join a b = match a, b with
+    | Bot, _ -> Bot
+    | _, Bot -> Bot
+    | Top, _ -> Top 
+    | _, Top -> Top 
+     (* interval cases. thinks about inf cases frist!*)
+    | Interval(a1, a2), Interval(b1, b2) -> if (comp a1 b1) && (comp a2 b2) then Interval(a1, b2) 
+                                            else if (comp a1 b1) && (comp b2 a2) then Interval(a1, a2)
+                                            else if (comp b1 a1) && (comp a2 b2) then Interval(b1, b2)
+                                            else if (comp b1 a1) && (comp b2 a2) then Interval(b1, a2)
+                                            else raise (Failure "Error: Impossible case in join")
+   
+  let meet a b = match a, b with  
+    | Bot, _ -> Bot
+    | _, Bot -> Bot
+    | Top, y -> y 
+    | x, Top -> x 
+     (* interval cases. thinks about inf cases frist!*)
+    | Interval(a1, a2), Interval(b1, b2) -> if (comp a1 b1) && (comp a2 b2) then Interval(b1, a2) 
+                                            else if (comp a1 b1) && (comp b2 a2) then Interval(b1, b2)
+                                            else if (comp b1 a1) && (comp a2 b2) then Interval(a1, a2)
+                                            else if (comp b1 a1) && (comp b2 a2) then Interval(a1, b2)
+                                            else raise (Failure "Error: Impossible case in meet")
+ 
+  (* this will be executed on x (widen) f(x). *)
+  let widen a b = match a, b with  
+    | Bot, y -> y
+    | x, Bot -> x
+    | Top, _ -> Top (* need to know more *) 
+    | _, Top -> Top (* need to know more *)
+    | Interval(a1, a2), Interval(b1, b2) -> let new_a = if (comp b1 a1) then N_inf else a1 in 
+                                            let new_b = if (comp a2 b2) then P_inf else b1 in 
+                                            Interval(new_a, new_b)
+ 
+  let narrow a b = match a, b with 
+    | Bot, _ -> Bot 
+    | _, Bot -> Bot  
+    | Top, y -> y (* need to know more *) 
+    | x, Top -> x (* need to know more *)
+    | Interval(a1, a2), Interval(b1, b2) -> let new_a = if (a1 == N_inf) then b1 else a1 in 
+                                            let new_b = if (a2 == P_inf) then b2 else a2 in 
+                                            Interval(new_a, new_b)
+ 
   let add a b = a (* TODO *)
   let mul a b = a (* TODO *)
   let sub a b = a (* TODO *)
