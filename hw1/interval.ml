@@ -296,16 +296,17 @@ module Interval : Interval = struct
                                             else if (comp b1 a1) && (comp b2 a2) then Interval(b1, a2)
                                             else raise (Failure "Error: Impossible case in join")
    
-  let meet a b = match a, b with  
+ (*fixed, it checks wheter there is an intersection or not.*)
+ let meet a b = match a, b with  
     | Bot, _ -> Bot
     | _, Bot -> Bot
     | Top, y -> y 
     | x, Top -> x 
      (* interval cases. thinks about inf cases frist!*)
-    | Interval(a1, a2), Interval(b1, b2) -> if (comp a1 b1) && (comp a2 b2) then Interval(b1, a2) 
-                                            else if (comp a1 b1) && (comp b2 a2) then Interval(b1, b2)
-                                            else if (comp b1 a1) && (comp a2 b2) then Interval(a1, a2)
-                                            else if (comp b1 a1) && (comp b2 a2) then Interval(a1, b2)
+    | Interval(a1, a2), Interval(b1, b2) -> if (comp a1 b1) && (comp a2 b2) then if b1 <= a2 then Interval(b1, a2) else Bot
+                                            else if (comp a1 b1) && (comp b2 a2) then Interval(b1, b2) (* this case is in situation where b is included in a.*)
+                                            else if (comp b1 a1) && (comp a2 b2) then Interval(a1, a2) (* this case is in situation where a is included in b.*)
+                                            else if (comp b1 a1) && (comp b2 a2) then if a1 <= b2 then Interval(a1, b2) else Bot
                                             else raise (Failure "Error: Impossible case in meet")
  
   (* this will be executed on x (widen) f(x). *)
@@ -327,9 +328,31 @@ module Interval : Interval = struct
                                             let new_b = if (a2 == P_inf) then b2 else a2 in 
                                             Interval(new_a, new_b)
  
-  let add a b = a (* TODO *)
-  let mul a b = a (* TODO *)
-  let sub a b = a (* TODO *)
+  let add a b = matcb a, b with 
+    | Bot, _ -> Bot 
+    | _, Bot -> Bot  
+    | Top, _ -> Top 
+    | _, Top -> Top 
+    | Interval(a1, a2), Interval(b1, b2) -> Interval(a1+b1, a2+b2)
+
+  let sub a b = match a, b with 
+    | Bot, _ -> Bot 
+    | _, Bot -> Bot  
+    | Top, _ -> Top 
+    | _, Top -> Top 
+    | Interval(a1, a2), Interval(b1, b2) -> Interval(a1-b2, a2-b1)
+
+  let mul a b = match a, b with  
+    | Bot, _ -> Bot 
+    | _, Bot -> Bot  
+    (*Technically, we can infer when 0 exists in interval however, i would not care about the case.*)
+    | Top, _ -> Top 
+    | _, Top -> Top 
+    | Interval(a1, a2), Interval(b1, b2) -> let t1 = a1 * b1 in let t2 = a1 * b2 in let t3 = a2 * b1 in let t4 = a2 * b2 in 
+                                            let candidate = [t1;t2;t3;t4] in 
+                                            let c1 = List.fold_right min candidate t1 in 
+                                            let c2 = List.fold_right max candidate t1 in
+                                            Interval(c1, c2) 
 
   let equal 
     a b = AbsBool.Top (* TODO *)
