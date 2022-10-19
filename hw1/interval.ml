@@ -343,27 +343,42 @@ module Interval : Interval = struct
     (* | Interval(Const a1, Const a2), Interval(Const b1, Const b2) -> Interval(Const (a1+b1), Const (a2+b2)) *)
     | Interval(a1, a2), Interval(b1, b2) -> 
       let new_a = (match a1, b1 with 
-        | P_inf, _ -> raise (Failure "P_inf is located in left of range.") (* this case is impossible considered def of widening *) 
-        | _, P_inf -> raise (Failure "P_inf is located in left of range.") (* this case is impossible considered def of widening *) 
+        | P_inf, _ -> raise (Failure "P_inf is located in left of range.") (* this case is impossible because of widening definition *)
+        | _, P_inf -> raise (Failure "P_inf is located in left of range.") (* this case is impossible because of widening definition *)
         | N_inf, _ -> N_inf 
         | _, N_inf -> N_inf 
-        | Const a1', Const b1' -> Const (a1 + b1)) in 
+        | Const a1', Const b1' -> Const (a1' + b1')) in 
       let new_b = (match a2, b2 with 
-        | N_inf, P_inf -> Top 
-        | P_inf, N_inf -> Top 
-        | N_inf, _ -> N_inf 
-        | _, N_inf -> N_inf 
+        | N_inf, _ -> raise (Failure "N_inf is located in right of range.") (* this case is impossible because of widening definition *) 
+        | _, N_inf -> raise (Failure "N_inf is located in right of range.") (* this case is impossible because of widening definition *)
         | P_inf, _ -> P_inf
         | _, P_inf -> P_inf
-        | Const a1', Const b1' -> Const (a1 + b1)) in
-        if new_a = Top || new_b = Top then Top else Interval(new_a, new_b) 
+        | Const a2', Const b2' -> Const (a2' + b2')) in 
+        Interval(new_a, new_b) 
 
   let sub a b = match (a, b) with 
     | Bot, _ -> Bot 
     | _, Bot -> Bot  
     | Top, _ -> Top 
     | _, Top -> Top 
-    | Interval(Const a1, Const a2), Interval(Const b1, Const b2) -> Interval(Const (a1-b2), Const (a2-b1))
+    | Interval(a1, a2), Interval(b1, b2) -> 
+      let new_a = (match a1, b1 with 
+        | P_inf, _ -> raise (Failure "P_inf is located in left of range.") (* this case is impossible because of widening definition *)
+        | _, P_inf -> raise (Failure "P_inf is located in left of range.") (* this case is impossible because of widening definition *)
+        | N_inf, N_inf -> Top (* we need to make this calculation involve all real execution. *)  
+        | N_inf, _ -> N_inf 
+        | _, N_inf -> P_inf 
+        | Const a1', Const b1' -> Const (a1' - b1')) in 
+      let new_b = (match a2, b2 with 
+        | N_inf, _ -> raise (Failure "N_inf is located in right of range.") (* this case is impossible because of widening definition *) 
+        | _, N_inf -> raise (Failure "N_inf is located in right of range.") (* this case is impossible because of widening definition *)
+        | P_inf, P_inf -> Top 
+        | P_inf, _ -> P_inf
+        | _, P_inf -> N_inf
+        | Const a2', Const b2' -> Const (a2' - b2')) in 
+        if (new_a = Top || new_b = Top) then Top else Interval(new_a, new_b) 
+
+   | Interval(Const a1, Const a2), Interval(Const b1, Const b2) -> Interval(Const (a1-b2), Const (a2-b1))
 
   let mul a b = match (a, b) with  
     | Bot, _ -> Bot 
