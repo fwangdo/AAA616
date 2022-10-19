@@ -244,7 +244,7 @@ module type Interval = sig
 end
 
 module Interval : Interval = struct
-  type atom = Const of int | N_inf | P_inf 
+  type atom = Const of int | N_inf | P_inf | Zero 
   (* N_inf means negative infinite, P_int means postiive negative.*)
   type t = Bot | Top | Interval of atom * atom  
 
@@ -276,6 +276,9 @@ module Interval : Interval = struct
     | N_inf, _ -> true 
     | _, N_inf -> false 
     | Const x, Const y -> if x <= y then true else false 
+    (* this case is added for checking whether it is positive or negative. *)
+    | Const x, Zero -> if x < 0 then true else false   
+    | Zero, Const y -> if 0 < y then true else false  
 
   let interval_min = fun a b -> if comp a b then a else b 
 
@@ -378,19 +381,38 @@ module Interval : Interval = struct
         | Const a2', Const b2' -> Const (a2' - b2')) in 
         if (new_a = Top || new_b = Top) then Top else Interval(new_a, new_b) 
 
-   | Interval(Const a1, Const a2), Interval(Const b1, Const b2) -> Interval(Const (a1-b2), Const (a2-b1))
-
+  (* in this part, we should consider order between new_a and new_b *)
+  (*
+    input: [a, b] [c, d]
+  
+    1) caculate a*c, a*d, b*c, b*d. 
+     1-1) if there is error case, handle it.
+    2) find min and max.
+    3) return [min, max]
+  *)
   let mul a b = match (a, b) with  
     | Bot, _ -> Bot 
     | _, Bot -> Bot  
-    (*Technically, we can infer when 0 exists in interval however, i would not care about the case.*)
     | Top, _ -> Top 
     | _, Top -> Top 
-    | Interval(Const a1, Const a2), Interval(Const b1, Const b2) -> let t1 = a1 * b1 in let t2 = a1 * b2 in let t3 = a2 * b1 in let t4 = a2 * b2 in 
+    | Interval(a1, a2), Interval(b1, b2) -> let t1 = mul_aux a1 b1 in let t2 = mul_aux a1 b2 in let t3 = mul_aux a2 b1 in let t4 = mul_aux a2 b2 in 
                                             let candidate = [t1;t2;t3;t4] in 
-                                            let c1 = List.fold_right min candidate t1 in 
-                                            let c2 = List.fold_right max candidate t1 in
-                                            Interval(Const c1, Const c2) 
+                                            let c1 = List.fold_right interval_min candidate t1 in 
+                                            let c2 = List.fold_right interval_max candidate t1 in
+                                            Interval(c1, c2)
+  and mul_aux : atom -> atom -> atom 
+  = fun a b -> match a, b with 
+    | P_inf, z' | z', P_inf -> (match z' with
+                                | P_inf -> P_inf
+                                | N_inf -> N_inf
+                                | Const 0 -> Const 0 
+                                | Const n -> if 0 < n then P_inf else N_inf)
+    | N_inf, z' | z', N_inf ->  (match z' with
+                                | P_inf -> N_inf
+                                | N_inf -> P_inf
+                                | Const 0 -> Const 0 
+                                | Const n -> if 0 < n then N_inf else P_inf)
+   | Const a', Const b' -> Const (a' * b') 
 
   let equal a b = match (a, b) with
     | Bot, _ -> Bot 
