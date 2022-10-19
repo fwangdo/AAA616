@@ -210,7 +210,7 @@ module AbsBool : AbsBool = struct
     | True -> False 
     | False -> True
     | _ -> b
-  let band : t -> t
+  let band : t -> t -> t
   = fun b1 b2 -> match b1, b2 with 
     | Bot, _ -> Bot 
     | _, Bot -> Bot 
@@ -222,6 +222,7 @@ module AbsBool : AbsBool = struct
 end
 
 module type Interval = sig
+  type atom
   type t 
   val bottom : t
   val to_string : t -> string
@@ -239,43 +240,48 @@ module type Interval = sig
   val equal : t -> t -> AbsBool.t
   val le : t -> t -> AbsBool.t
   val ge : t -> t -> AbsBool.t
+  val comp : atom -> atom -> bool
 end
 
 module Interval : Interval = struct
-(* N_inf means negative infinite, P_int means postiive negative.*)
-  type atom = int | N_inf | P_inf 
+  type atom = Const of int | N_inf | P_inf 
+  (* N_inf means negative infinite, P_int means postiive negative.*)
   type t = Bot | Top | Interval of atom * atom  
 
   let bottom = Bot 
 
-  let to_string: t -> string 
+  let to_string : t -> string 
   = fun i -> match i with 
     | Bot -> "Bottom" 
     | Top -> "Top"
     | Interval(i1, i2) -> let str_i1 = string_of_int i1 in let str_i2 = string_of_int i2 in "[" ^ str_i1 ^ ", " ^ str_i2 ^ "]"
 
   (* I guess this function is for abstracting concrete values. *)
-  let alpha: int -> t 
-  = fun n -> Interval(n, n)  
+  let alpha : int -> t 
+  = fun n -> Interval(Const n, Const n)  
 
   (* (-inf, n) *)
-  let alpha_to: int -> t 
-  = fun n -> Interval(N_inf, n)
+  let alpha_to : int -> t 
+  = fun n -> Interval(N_inf, Const n)
 
   (* (n, inf) *)
-  let alpha_from: int -> t
-  = fun n -> Interval(n, P_inf)
+  let alpha_from : int -> t
+  = fun n -> Interval(Const n, P_inf)
 
   (* order for atom. only if something located in right is greater than left one, then return value would be true*)
-  let comp: atom -> atom -> bool 
+  let comp : atom -> atom -> bool 
   = fun a b -> match a, b with 
-    | _, P_inf = true
-    | P_inf, _ = false 
-    | N_inf, _ = true 
-    | _, N_inf = false 
-    | x, y     = if x <= y then true else false 
+    | _, P_inf -> true
+    | P_inf, _ -> false 
+    | N_inf, _ -> true 
+    | _, N_inf -> false 
+    | Const x, Const y -> if x <= y then true else false 
 
-  let order: t -> t -> bool 
+  let interval_min = fun a b -> if comp a b then a else b 
+
+  let interval_max = fun a b -> if comp a b then b else a 
+
+  let order : t -> t -> bool 
   = fun a b -> match (a,b) with 
     | Bot, _ -> true 
     | _, Bot -> false
@@ -297,20 +303,20 @@ module Interval : Interval = struct
                                             else raise (Failure "Error: Impossible case in join")
    
  (*fixed, it checks wheter there is an intersection or not.*)
- let meet a b = match a, b with  
+ let meet a b = match (a, b) with  
     | Bot, _ -> Bot
     | _, Bot -> Bot
     | Top, y -> y 
     | x, Top -> x 
      (* interval cases. thinks about inf cases frist!*)
-    | Interval(a1, a2), Interval(b1, b2) -> if (comp a1 b1) && (comp a2 b2) then if b1 <= a2 then Interval(b1, a2) else Bot
+    | Interval(a1, a2), Interval(b1, b2) -> if (comp a1 b1) && (comp a2 b2) then if comp b1 a2 then Interval(b1, a2) else Bot
                                             else if (comp a1 b1) && (comp b2 a2) then Interval(b1, b2) (* this case is in situation where b is included in a.*)
                                             else if (comp b1 a1) && (comp a2 b2) then Interval(a1, a2) (* this case is in situation where a is included in b.*)
-                                            else if (comp b1 a1) && (comp b2 a2) then if a1 <= b2 then Interval(a1, b2) else Bot
+                                            else if (comp b1 a1) && (comp b2 a2) then if comp a1 b2 then Interval(a1, b2) else Bot
                                             else raise (Failure "Error: Impossible case in meet")
  
   (* this will be executed on x (widen) f(x). *)
-  let widen a b = match a, b with  
+  let widen a b = match (a, b) with  
     | Bot, y -> y
     | x, Bot -> x
     | Top, _ -> Top (* need to know more *) 
@@ -319,47 +325,78 @@ module Interval : Interval = struct
                                             let new_b = if (comp a2 b2) then P_inf else b1 in 
                                             Interval(new_a, new_b)
  
-  let narrow a b = match a, b with 
+  let narrow a b = match (a, b) with 
     | Bot, _ -> Bot 
     | _, Bot -> Bot  
     | Top, y -> y (* need to know more *) 
     | x, Top -> x (* need to know more *)
-    | Interval(a1, a2), Interval(b1, b2) -> let new_a = if (a1 == N_inf) then b1 else a1 in 
-                                            let new_b = if (a2 == P_inf) then b2 else a2 in 
+    | Interval(a1, a2), Interval(b1, b2) -> let new_a = if (a1 = N_inf) then b1 else a1 in 
+                                            let new_b = if (a2 = P_inf) then b2 else a2 in 
                                             Interval(new_a, new_b)
  
-  let add a b = matcb a, b with 
+  (* this part should consider N_inf and P_inf cases.*)
+  let add a b = match (a, b) with 
     | Bot, _ -> Bot 
     | _, Bot -> Bot  
     | Top, _ -> Top 
     | _, Top -> Top 
-    | Interval(a1, a2), Interval(b1, b2) -> Interval(a1+b1, a2+b2)
+    (* | Interval(Const a1, Const a2), Interval(Const b1, Const b2) -> Interval(Const (a1+b1), Const (a2+b2)) *)
+    | Interval(a1, a2), Interval(b1, b2) -> 
+      let new_a = (match a1, b1 with 
+        | P_inf, _ -> raise (Failure "P_inf is located in left of range.") (* this case is impossible considered def of widening *) 
+        | _, P_inf -> raise (Failure "P_inf is located in left of range.") (* this case is impossible considered def of widening *) 
+        | N_inf, _ -> N_inf 
+        | _, N_inf -> N_inf 
+        | Const a1', Const b1' -> Const (a1 + b1)) in 
+      let new_b = (match a2, b2 with 
+        | N_inf, P_inf -> Top 
+        | P_inf, N_inf -> Top 
+        | N_inf, _ -> N_inf 
+        | _, N_inf -> N_inf 
+        | P_inf, _ -> P_inf
+        | _, P_inf -> P_inf
+        | Const a1', Const b1' -> Const (a1 + b1)) in
+        if new_a = Top || new_b = Top then Top else Interval(new_a, new_b) 
 
-  let sub a b = match a, b with 
+  let sub a b = match (a, b) with 
     | Bot, _ -> Bot 
     | _, Bot -> Bot  
     | Top, _ -> Top 
     | _, Top -> Top 
-    | Interval(a1, a2), Interval(b1, b2) -> Interval(a1-b2, a2-b1)
+    | Interval(Const a1, Const a2), Interval(Const b1, Const b2) -> Interval(Const (a1-b2), Const (a2-b1))
 
-  let mul a b = match a, b with  
+  let mul a b = match (a, b) with  
     | Bot, _ -> Bot 
     | _, Bot -> Bot  
     (*Technically, we can infer when 0 exists in interval however, i would not care about the case.*)
     | Top, _ -> Top 
     | _, Top -> Top 
-    | Interval(a1, a2), Interval(b1, b2) -> let t1 = a1 * b1 in let t2 = a1 * b2 in let t3 = a2 * b1 in let t4 = a2 * b2 in 
+    | Interval(Const a1, Const a2), Interval(Const b1, Const b2) -> let t1 = a1 * b1 in let t2 = a1 * b2 in let t3 = a2 * b1 in let t4 = a2 * b2 in 
                                             let candidate = [t1;t2;t3;t4] in 
                                             let c1 = List.fold_right min candidate t1 in 
                                             let c2 = List.fold_right max candidate t1 in
-                                            Interval(c1, c2) 
+                                            Interval(Const c1, Const c2) 
 
-  let equal 
-    a b = AbsBool.Top (* TODO *)
+  let equal a b = match (a, b) with
+    | Bot, _ -> Bot 
+    | _, Bot -> Bot  
+    | Top, _ -> Top 
+    | _, Top -> Top 
+    | Interval(Const a1, Const a2), Interval(Const b1, Const b2) -> if (a1=b1) && (a2=b2) then AbsBool.True 
+                                            else if (a2 < b1) then AbsBool.False
+                                            else if (b2 < a1) then AbsBool.False
+                                            else AbsBool.Top
 
-  let le a b = AbsBool.Top (* TODO *)
+  let le a b = match (a,b) with 
+    | Bot, _ -> AbsBool.Bot
+    | _, Bot -> AbsBool.Bot
+    | Top, _ -> AbsBool.Top
+    | _, Top -> AbsBool.Top
+    | _  -> AbsBoo.Top
+    (*wait.*)
 
   let ge a b = AbsBool.Top (* TODO *)
+
 end
 
 module VarMap = Map.Make(String)
