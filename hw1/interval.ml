@@ -244,17 +244,25 @@ module type Interval = sig
 end
 
 module Interval : Interval = struct
-  type atom = Const of int | N_inf | P_inf | Zero 
+  type atom = Const of int | N_inf | P_inf | A_Top | A_Bot 
   (* N_inf means negative infinite, P_int means postiive negative.*)
   type t = Bot | Top | Interval of atom * atom  
 
   let bottom = Bot 
 
+  let string_of_atom : atom -> string
+  = fun a -> match a with 
+    | Const i1 -> string_of_int i1 
+    | N_inf -> "N_inf"
+    | P_inf -> "P_inf"
+    | A_Top -> "A_Top"
+    | A_Bot -> "A_Bot"
+
   let to_string : t -> string 
   = fun i -> match i with 
     | Bot -> "Bottom" 
     | Top -> "Top"
-    | Interval(i1, i2) -> let str_i1 = string_of_int i1 in let str_i2 = string_of_int i2 in "[" ^ str_i1 ^ ", " ^ str_i2 ^ "]"
+    | Interval(i1, i2) -> let str_i1 = string_of_atom i1 in let str_i2 = string_of_atom i2 in "[" ^ str_i1 ^ ", " ^ str_i2 ^ "]"
 
   (* I guess this function is for abstracting concrete values. *)
   let alpha : int -> t 
@@ -276,9 +284,6 @@ module Interval : Interval = struct
     | N_inf, _ -> true 
     | _, N_inf -> false 
     | Const x, Const y -> if x <= y then true else false 
-    (* this case is added for checking whether it is positive or negative. *)
-    | Const x, Zero -> if x < 0 then true else false   
-    | Zero, Const y -> if 0 < y then true else false  
 
   let interval_min = fun a b -> if comp a b then a else b 
 
@@ -359,6 +364,7 @@ module Interval : Interval = struct
         | Const a2', Const b2' -> Const (a2' + b2')) in 
         Interval(new_a, new_b) 
 
+  (* it's wrong. need to fix.*)
   let sub a b = match (a, b) with 
     | Bot, _ -> Bot 
     | _, Bot -> Bot  
@@ -368,18 +374,18 @@ module Interval : Interval = struct
       let new_a = (match a1, b1 with 
         | P_inf, _ -> raise (Failure "P_inf is located in left of range.") (* this case is impossible because of widening definition *)
         | _, P_inf -> raise (Failure "P_inf is located in left of range.") (* this case is impossible because of widening definition *)
-        | N_inf, N_inf -> Top (* we need to make this calculation involve all real execution. *)  
+        | N_inf, N_inf -> A_Top (* we need to make this calculation involve all real execution. *)  
         | N_inf, _ -> N_inf 
         | _, N_inf -> P_inf 
         | Const a1', Const b1' -> Const (a1' - b1')) in 
       let new_b = (match a2, b2 with 
         | N_inf, _ -> raise (Failure "N_inf is located in right of range.") (* this case is impossible because of widening definition *) 
         | _, N_inf -> raise (Failure "N_inf is located in right of range.") (* this case is impossible because of widening definition *)
-        | P_inf, P_inf -> Top 
+        | P_inf, P_inf -> A_Top 
         | P_inf, _ -> P_inf
         | _, P_inf -> N_inf
         | Const a2', Const b2' -> Const (a2' - b2')) in 
-        if (new_a = Top || new_b = Top) then Top else Interval(new_a, new_b) 
+        if (new_a = A_Top || new_b = A_Top) then Top else Interval(new_a, new_b) 
 
   (* in this part, we should consider order between new_a and new_b *)
   (*
@@ -414,30 +420,45 @@ module Interval : Interval = struct
                                 | N_inf -> P_inf
                                 | Const 0 -> Const 0 
                                 | Const n -> if 0 < n then N_inf else P_inf)
-   | Const a', Const b' -> Const (a' * b') 
+    | Const a', Const b' -> Const (a' * b') 
 
   let equal a b = match (a, b) with
     | Bot, _ -> Bot 
     | _, Bot -> Bot  
     | Top, _ -> Top 
     | _, Top -> Top 
-    | Interval(Const a1, Const a2), Interval(Const b1, Const b2) -> if (a1=b1) && (a2=b2) then AbsBool.True 
-                                            else if (a2 < b1) then AbsBool.False
-                                            else if (b2 < a1) then AbsBool.False
-                                            else AbsBool.Top
+    | Interval(a1, a2), Interval(b1, b2) ->
+  and equal_aux : atom -> atom -> AbsBool.t
+  
+    
 
+
+    | Interval(Const a1, Const a2), Interval(Const b1, Const b2) -> if (a1=b1) && (a2=b2) then AbsBool.True 
+                                                                    else if (a2 < b1) then AbsBool.False
+                                                                    else if (b2 < a1) then AbsBool.False
+                                                                    else AbsBool.Top
+
+(*
+  no intersection: true or false
+  intersection: top
+*)
   let le a b = match (a,b) with 
     | Bot, _ -> AbsBool.Bot
     | _, Bot -> AbsBool.Bot
     | Top, _ -> AbsBool.Top
     | _, Top -> AbsBool.Top
-    | Interval(Const a1, Const a2), Interval(Const b1, Const b2) -> if (a1=b1) && (a2=b2) then AbsBool.True 
-                                            else if (a2 < b1) then AbsBool.False
-                                            else if (b2 < a1) then AbsBool.False
-                                            else AbsBool.Top
+    | Interval(a1, a2), Interval(b1, b2) -> if (comp a2 b1) && (a2 <> b1) then AbsBool.True 
+                                            else if (comp b2 a1) && (a2 <> b1) then AbsBool.False
+                                            else AbsBool.Top 
 
-
-  let ge a b = AbsBool.Top (* TODO *)
+  let ge a b = match (a,b) with   
+    | Bot, _ -> AbsBool.Bot
+    | _, Bot -> AbsBool.Bot
+    | Top, _ -> AbsBool.Top
+    | _, Top -> AbsBool.Top
+    | Interval(a1, a2), Interval(b1, b2) -> if (comp b2 a1) && (a2 <> b1) then AbsBool.True 
+                                            else if (comp a2 b1) && (a2 <> b1) then AbsBool.False
+                                            else AbsBool.Top 
 
 end
 
