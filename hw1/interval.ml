@@ -244,7 +244,7 @@ module type Interval = sig
 end
 
 module Interval : Interval = struct
-  type atom = Const of int | N_inf | P_inf | A_Top | A_Bot 
+  type atom = Const of int | N_inf | P_inf
   (* N_inf means negative infinite, P_int means postiive negative.*)
   type t = Bot | Top | Interval of atom * atom  
 
@@ -381,7 +381,7 @@ module Interval : Interval = struct
         | P_inf, _ -> P_inf
         | _, N_inf -> P_inf
         | Const a2', Const b2' -> Const (a2' - b2')) in 
-        if (new_a = A_Top || new_b = A_Top) then Top else Interval(new_a, new_b) 
+        Interval(new_a, new_b) 
 
   (* in this part, we should consider order between new_a and new_b *)
   (*
@@ -392,7 +392,7 @@ module Interval : Interval = struct
     2) find min and max.
     3) return [min, max]
   *)
-  let mul a b = match (a, b) with  
+  let rec mul a b = match (a, b) with  
     | Bot, _ -> Bot 
     | _, Bot -> Bot  
     | Interval(Const 0, Const 0), _ -> Interval(Const 0, Const 0)
@@ -423,6 +423,9 @@ module Interval : Interval = struct
   let rec intersection : t -> t -> bool
   = fun a b -> match a, b with 
     | Interval(a1, a2), Interval(b1, b2) -> 
+      if comp a1 b1 then (if comp b2 a2 then true else (if comp b1 a2 then true else false))
+      else if comp b1 a1 then (if comp a2 b2 then true else (if comp a1 b2 then true else false))
+      else false 
     | _ -> false
 
   (* 
@@ -431,34 +434,38 @@ module Interval : Interval = struct
      Top   -> otherwise. it means there is an intersection.
   *)
   let equal a b = match (a, b) with
-    | Bot, _ -> Bot 
-    | _, Bot -> Bot  
-    | Top, _ -> Top 
-    | _, Top -> Top 
-    | Interval(Const a1, Const a2), Interval(Const b1, Const b2) -> if then AbsBool.True else 
+    | Bot, _ -> AbsBool.Bot 
+    | _, Bot -> AbsBool.Bot  
+    | Top, _ -> AbsBool.Top 
+    | _, Top -> AbsBool.Top 
+    | Interval(Const a1, Const a2), Interval(Const b1, Const b2) -> 
+      if (a1 = a2) && (a2 = b1) && (b1 = b2) then AbsBool.True
+      else if intersection a b then AbsBool.Top else AbsBool.False
+    | x, y -> if intersection x y then AbsBool.Top else AbsBool.False 
 
 (*
-  no intersection: true or false
-  intersection: top
+    When we talk based on location of b,
+    True  -> No intersection, only if range is left compared to 'a' perfectly.
+    False -> No intersection, only if range is right compare to 'a' perfectly.
+    Top -> interesection.
 *)
   let le a b = match (a,b) with 
     | Bot, _ -> AbsBool.Bot
     | _, Bot -> AbsBool.Bot
     | Top, _ -> AbsBool.Top
     | _, Top -> AbsBool.Top
-    | Interval(a1, a2), Interval(b1, b2) -> if (comp a2 b1) && (a2 <> b1) then AbsBool.True 
-                                            else if (comp b2 a1) && (a2 <> b1) then AbsBool.False
-                                            else AbsBool.Top 
+    | Interval(a1, a2), Interval(b1, b2) -> 
+      if comp a2 b1 then AbsBool.True else (* this one includes a2 == b1 case.*)
+        if intersection a b then AbsBool.Top else AbsBool.False  (* b1 is less than a2 without intersection. it means whole range of b is less then range of a. *)
 
   let ge a b = match (a,b) with   
     | Bot, _ -> AbsBool.Bot
     | _, Bot -> AbsBool.Bot
     | Top, _ -> AbsBool.Top
     | _, Top -> AbsBool.Top
-    | Interval(a1, a2), Interval(b1, b2) -> if (comp b2 a1) && (a2 <> b1) then AbsBool.True 
-                                            else if (comp a2 b1) && (a2 <> b1) then AbsBool.False
-                                            else AbsBool.Top 
-
+    | Interval(a1, a2), Interval(b1, b2) -> 
+      if comp b2 a1 then AbsBool.True else (* this one includes a2 == b1 case.*)
+        if intersection a b then AbsBool.Top else AbsBool.False  (* b1 is less than a2 without intersection. it means whole range of b is less then range of a. *)
 end
 
 module VarMap = Map.Make(String)
