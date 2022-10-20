@@ -393,6 +393,8 @@ module Interval : Interval = struct
   let mul a b = match (a, b) with  
     | Bot, _ -> Bot 
     | _, Bot -> Bot  
+    | Interval(Const 0, Const 0), _ -> Interval(Const 0, Const 0)
+    | _, Interval(Const 0, Const 0) -> Interval(Const 0, Const 0)
     | Top, _ -> Top 
     | _, Top -> Top 
     | Interval(a1, a2), Interval(b1, b2) -> let t1 = mul_aux a1 b1 in let t2 = mul_aux a1 b2 in let t3 = mul_aux a2 b1 in let t4 = mul_aux a2 b2 in 
@@ -429,8 +431,11 @@ module Interval : Interval = struct
     | _, Bot -> AbsBool.Bot
     | Top, _ -> AbsBool.Top
     | _, Top -> AbsBool.Top
-    | _  -> AbsBoo.Top
-    (*wait.*)
+    | Interval(Const a1, Const a2), Interval(Const b1, Const b2) -> if (a1=b1) && (a2=b2) then AbsBool.True 
+                                            else if (a2 < b1) then AbsBool.False
+                                            else if (b2 < a1) then AbsBool.False
+                                            else AbsBool.Top
+
 
   let ge a b = AbsBool.Top (* TODO *)
 
