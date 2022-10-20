@@ -481,15 +481,29 @@ module type AbsMem = sig
   val print : t -> unit 
 end
 
+(* this one is for caculation while executing commands with absmem *)
 module AbsMem : AbsMem = struct
   type t = Interval.t VarMap.t 
+
   let empty = VarMap.empty
-  let add x v m = m (* TODO *)
-  let find x m = Interval.bottom (* TODO *)
-  let join m1 m2 = m1 (* TODO *) 
+
+  let add x v m = 
+    let abs = find x m in Interval.add abs (Interval.alpha v) 
+
+  let find x m = try VarMap.find x m with _ -> Interval.bottom 
+
+  let rec join m1 m2 = 
+    let m1' = VarMap.bindings m1 in 
+    let m2  = VarMap.bindings m2 in 
+    (* To-Do *)
+    
+  and join_aux : Interval.t -> Interval.t -> Interval.t 
+  = fun a b -> Interval.join a b 
+    
   let widen m1 m2 = m1 (* TODO *) 
   let narrow m1 m2 = m1 (* TODO *)
   let order m1 m2 = true (* TODO *) 
+
   let print m = VarMap.iter (fun x v -> prerr_endline 
     (x ^ " |-> " ^ Interval.to_string v)) m 
 end
