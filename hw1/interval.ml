@@ -395,8 +395,8 @@ module Interval : Interval = struct
   let rec mul a b = match (a, b) with  
     | Bot, _ -> Bot 
     | _, Bot -> Bot  
-    | Interval(Const 0, Const 0), _ -> Interval(Const 0, Const 0)
-    | _, Interval(Const 0, Const 0) -> Interval(Const 0, Const 0)
+    (* | Interval(Const 0, Const 0), _ -> Interval(Const 0, Const 0)
+    | _, Interval(Const 0, Const 0) -> Interval(Const 0, Const 0) *)
     | Top, _ -> Top 
     | _, Top -> Top 
     | Interval(a1, a2), Interval(b1, b2) -> let t1 = mul_aux a1 b1 in let t2 = mul_aux a1 b2 in let t3 = mul_aux a2 b1 in let t4 = mul_aux a2 b2 in 
@@ -417,8 +417,6 @@ module Interval : Interval = struct
                                 | Const 0 -> Const 0 
                                 | Const n -> if 0 < n then N_inf else P_inf)
     | Const a', Const b' -> Const (a' * b') 
-
-  (* auxilary function for checking whether there is an intersection or not. *)
   (* Need to consider 2 inclusion cases and 2 intersection cases. *)
   let rec intersection : t -> t -> bool
   = fun a b -> match a, b with 
@@ -572,8 +570,35 @@ module Table : Table = struct
     prerr_endline "") t  
 end
 
+(* it needs to consider a case where r-value has variables.*)
+let rec execute : cmd -> AbsMem.t -> AbsMem.AbsMemt
+= fun cmd mem -> match cmd with 
+  | I_skip -> mem  
+  | I_assign (s1, a2) ->  let a2' = execute_aexp a2 in 
+                          let update_aux a = function | None -> None | Some x -> Some a2' in  
+                          VarMap.update s1 update_aux mem  
+  (* CFG should be separated into several conditions when bool expression's' are in condition of while.*)
+  (* We assume a situation where we have a very well seperate cfg. so handle a case where it has just a one bool exp. *)
+  | I_assume b -> 
+(* we need to caculate values of aexp but value in vars are abstracted *)
+and execute_aexp : aexp -> AbsMem.t -> Interval.t 
+= fun exp mem -> match exp with 
+  | Const i -> Interval.alpha i 
+  | Var s -> VarMap.find s mem 
+  | Plus (a1, a2) -> Interval.add (execute_aexp a1) (execute_aexp a2)
+  | Mult (a1, a2) -> Interval.mul (execute_aexp a1) (execute_aexp a2)
+  | Sub  (a1, a2) -> Interval.sub (execute_aexp a1) (execute_aexp a2)
+and exeucte_bexp : bexp -> AbsMem.t -> AbsBool.t
+= fun exp mem -> match exp with 
+  | True -> AbsBool.True
+  | False -> AbsBool.False
+  | Equal (a1, a2) ->  
+  | Le of aexp * aexp
+  | Not of bexp
+  | And of bexp * bexp
+
 let analyze : Cfg.t -> Table.t
-=fun g -> Table.empty (* TODO *)
+= fun g -> Table.init g in (* Every node has a bottom here.*) 
 
 
 let pgm = 
