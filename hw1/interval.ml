@@ -493,7 +493,13 @@ module AbsMem : AbsMem = struct
 
   let keys b = List.fold_right (fun (k,v) lst -> k::lst) b []
 
-  let rec calc f m1 m2 m2_keys m3 = match m2_keys with
+  let rec union_keys : string list -> string list -> string list 
+  = fun a b -> match b with 
+    | hd::tl -> if List.mem hd a then union_keys a tl else union_keys (hd::a) tl 
+    | [] -> a 
+
+  let rec calc : (Interval.t -> Interval.t -> Interval.t) -> t -> t -> string list -> t -> t
+  = fun f m1 m2 keys m3 -> match keys with
     | hd::tl -> let m2_val = find hd m2 in let m1_val = find hd m1 in 
                 let m3' = add hd (f m1_val m2_val) m3 in
                 calc f m1 m2 tl m3'
@@ -501,34 +507,42 @@ module AbsMem : AbsMem = struct
   
   (* m2 is bigger than m1 *)
   let join m1 m2 = 
-    (* let m1' = VarMap.bindings m1 in  *)
+    let m1' = VarMap.bindings m1 in 
     let m2' = VarMap.bindings m2 in 
-    (* let m1_keys = keys m1' in *)
+    let m1_keys = keys m1' in
     let m2_keys = keys m2' in  
-    let m3 = empty in calc (Interval.join) m1 m2 m2_keys m3 
+    let keys = union_keys m1_keys m2_keys in 
+    let m3 = empty in calc (Interval.join) m1 m2 keys m3 
    
   let widen m1 m2 = 
-    (* let m1' = VarMap.bindings m1 in  *)
+    let m1' = VarMap.bindings m1 in 
     let m2' = VarMap.bindings m2 in 
-    (* let m1_keys = keys m1' in *)
+    let m1_keys = keys m1' in
     let m2_keys = keys m2' in  
-    let m3 = empty in calc (Interval.widen) m1 m2 m2_keys m3 
+    let keys = union_keys m1_keys m2_keys in 
+    let m3 = empty in calc (Interval.widen) m1 m2 keys m3 
  
   let narrow m1 m2 = 
-    (* let m1' = VarMap.bindings m1 in  *)
+    let m1' = VarMap.bindings m1 in 
     let m2' = VarMap.bindings m2 in 
-    (* let m1_keys = keys m1' in *)
+    let m1_keys = keys m1' in
     let m2_keys = keys m2' in  
-    let m3 = empty in calc (Interval.narrow) m1 m2 m2_keys m3 
+    let keys = union_keys m1_keys m2_keys in 
+    let m3 = empty in calc (Interval.narrow) m1 m2 keys m3 
  
-  (* this one needs to be fixed.*)
-  let order m1 m2 = true  
+  (* True only if we know m1 <= m2. *)
+  let rec order m1 m2 = true 
     (* let m1' = VarMap.bindings m1 in 
     let m2' = VarMap.bindings m2 in 
     let m1_keys = keys m1' in
     let m2_keys = keys m2' in  
-    let m3 = empty in calc (Interval.order) m1 m2 m2_keys m3 
-  *)
+    let keys = union_keys m1_keys m2_keys in 
+    let m3 = empty in calc (Interval.order) m1 m2 keys m3 
+  and order_aux : string list -> AbsMem.t -> bool 
+  = fun slist vmap ->
+    let value : string ->  -> bool  = fun a b -> a && b in 
+    List.fold_right value slist (true) *)
+ 
   let print m = VarMap.iter (fun x v -> prerr_endline 
     (x ^ " |-> " ^ Interval.to_string v)) m 
 end
