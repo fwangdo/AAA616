@@ -253,8 +253,8 @@ module Interval : Interval = struct
   let string_of_atom : atom -> string
   = fun a -> match a with 
     | Const i1 -> string_of_int i1 
-    | N_inf -> "N_inf"
-    | P_inf -> "P_inf"
+    | N_inf -> "-oo"
+    | P_inf -> "+oo"
 
   let to_string : t -> string 
   = fun i -> match i with 
@@ -504,6 +504,12 @@ module AbsMem : AbsMem = struct
                 let m3' = add hd (f m1_val m2_val) m3 in
                 calc f m1 m2 tl m3'
     | _ -> m3
+
+  let rec calc_bool : (Interval.t -> Interval.t -> bool) -> t -> t -> string list -> bool 
+  = fun f m1 m2 keys -> match keys with
+    | hd::tl -> let m2_val = find hd m2 in let m1_val = find hd m1 in 
+                if (f m1_val m2_val) then calc_bool f m1 m2 tl else false   
+    | _ -> true 
   
   (* m2 is bigger than m1 *)
   let join m1 m2 = 
@@ -530,19 +536,15 @@ module AbsMem : AbsMem = struct
     let keys = union_keys m1_keys m2_keys in 
     let m3 = empty in calc (Interval.narrow) m1 m2 keys m3 
  
-  (* True only if we know m1 <= m2. *)
-  let rec order m1 m2 = true 
-    (* let m1' = VarMap.bindings m1 in 
+  (* only if all cases are true. *)
+  let rec order m1 m2 = 
+    let m1' = VarMap.bindings m1 in 
     let m2' = VarMap.bindings m2 in 
     let m1_keys = keys m1' in
     let m2_keys = keys m2' in  
     let keys = union_keys m1_keys m2_keys in 
-    let m3 = empty in calc (Interval.order) m1 m2 keys m3 
-  and order_aux : string list -> AbsMem.t -> bool 
-  = fun slist vmap ->
-    let value : string ->  -> bool  = fun a b -> a && b in 
-    List.fold_right value slist (true) *)
- 
+    calc_bool (Interval.order) m1 m2 keys
+  
   let print m = VarMap.iter (fun x v -> prerr_endline 
     (x ^ " |-> " ^ Interval.to_string v)) m 
 end
@@ -586,7 +588,7 @@ let pgm =
   ]
 
 let cfg = cmd2cfg pgm 
-let _ = Cfg.print cfg
-let _ = Cfg.dot cfg
+(* let _ = Cfg.print cfg
+let _ = Cfg.dot cfg *)
 (* let table = analyze cfg 
 let _ = Table.print table *)
