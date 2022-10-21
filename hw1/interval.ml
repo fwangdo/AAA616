@@ -487,23 +487,48 @@ module AbsMem : AbsMem = struct
 
   let empty = VarMap.empty
 
-  let add x v m = 
-    let abs = find x m in Interval.add abs (Interval.alpha v) 
-
   let find x m = try VarMap.find x m with _ -> Interval.bottom 
 
-  let rec join m1 m2 = 
-    let m1' = VarMap.bindings m1 in 
-    let m2  = VarMap.bindings m2 in 
-    (* To-Do *)
-    
-  and join_aux : Interval.t -> Interval.t -> Interval.t 
-  = fun a b -> Interval.join a b 
-    
-  let widen m1 m2 = m1 (* TODO *) 
-  let narrow m1 m2 = m1 (* TODO *)
-  let order m1 m2 = true (* TODO *) 
+  let add x v m = VarMap.add x v m  
 
+  let keys b = List.fold_right (fun (k,v) lst -> k::lst) b []
+
+  let rec calc f m1 m2 m2_keys m3 = match m2_keys with
+    | hd::tl -> let m2_val = find hd m2 in let m1_val = find hd m1 in 
+                let m3' = add hd (f m1_val m2_val) m3 in
+                calc f m1 m2 tl m3'
+    | _ -> m3
+  
+  (* m2 is bigger than m1 *)
+  let join m1 m2 = 
+    (* let m1' = VarMap.bindings m1 in  *)
+    let m2' = VarMap.bindings m2 in 
+    (* let m1_keys = keys m1' in *)
+    let m2_keys = keys m2' in  
+    let m3 = empty in calc (Interval.join) m1 m2 m2_keys m3 
+   
+  let widen m1 m2 = 
+    (* let m1' = VarMap.bindings m1 in  *)
+    let m2' = VarMap.bindings m2 in 
+    (* let m1_keys = keys m1' in *)
+    let m2_keys = keys m2' in  
+    let m3 = empty in calc (Interval.widen) m1 m2 m2_keys m3 
+ 
+  let narrow m1 m2 = 
+    (* let m1' = VarMap.bindings m1 in  *)
+    let m2' = VarMap.bindings m2 in 
+    (* let m1_keys = keys m1' in *)
+    let m2_keys = keys m2' in  
+    let m3 = empty in calc (Interval.narrow) m1 m2 m2_keys m3 
+ 
+  (* this one needs to be fixed.*)
+  let order m1 m2 = true  
+    (* let m1' = VarMap.bindings m1 in 
+    let m2' = VarMap.bindings m2 in 
+    let m1_keys = keys m1' in
+    let m2_keys = keys m2' in  
+    let m3 = empty in calc (Interval.order) m1 m2 m2_keys m3 
+  *)
   let print m = VarMap.iter (fun x v -> prerr_endline 
     (x ^ " |-> " ^ Interval.to_string v)) m 
 end
