@@ -571,7 +571,7 @@ module Table : Table = struct
 end
 
 (* it needs to consider a case where r-value has variables.*)
-let rec execute : cmd -> AbsMem.t -> AbsMem.AbsMemt
+let rec execute : cmd -> AbsMem.t -> AbsMem.t
 = fun cmd mem -> match cmd with 
   | I_skip -> mem  
   | I_assign (s1, a2) ->  let a2' = execute_aexp a2 in 
@@ -588,14 +588,18 @@ and execute_aexp : aexp -> AbsMem.t -> Interval.t
   | Plus (a1, a2) -> Interval.add (execute_aexp a1) (execute_aexp a2)
   | Mult (a1, a2) -> Interval.mul (execute_aexp a1) (execute_aexp a2)
   | Sub  (a1, a2) -> Interval.sub (execute_aexp a1) (execute_aexp a2)
-and exeucte_bexp : bexp -> AbsMem.t -> AbsBool.t
-= fun exp mem -> match exp with 
-  | True -> AbsBool.True
-  | False -> AbsBool.False
-  | Equal (a1, a2) ->  
-  | Le of aexp * aexp
-  | Not of bexp
-  | And of bexp * bexp
+(* this one will return memory itself.*)
+and exeucte_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
+= fun exp mem not -> match exp with (* n_not means the number of not *) 
+  | True           -> mem 
+  | False          -> mem 
+  | Equal (a1, a2) -> if not then (* it's negation case *)  
+                      else 
+  | Le    (a1, a2) -> if not then 
+                      else
+  | Not   b        -> execute_bexp b mem (if not then false else true) (* then -> double negation. *)  
+  | And   (b1, b2) -> if not then let mem' = execute_bexp b1 mem not in let mem'' = execute_bexp b2 mem not in AbsMem.join mem' mem''  
+                      else let mem' = execute_bexp b1 mem not in execute_bexp b2 mem' not 
 
 let analyze : Cfg.t -> Table.t
 = fun g -> Table.init g in (* Every node has a bottom here.*) 
