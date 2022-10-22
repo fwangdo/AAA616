@@ -594,12 +594,21 @@ and exeucte_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
   | True           -> mem 
   | False          -> mem 
   | Equal (a1, a2) -> if not then (* it's negation case *)  
-                      else 
+                      else d 
   | Le    (a1, a2) -> if not then 
                       else
   | Not   b        -> execute_bexp b mem (if not then false else true) (* then -> double negation. *)  
   | And   (b1, b2) -> if not then let mem' = execute_bexp b1 mem not in let mem'' = execute_bexp b2 mem not in AbsMem.join mem' mem''  
                       else let mem' = execute_bexp b1 mem not in execute_bexp b2 mem' not 
+(* consider relations between variables in eq, le. *)
+and aux_bexp : aexp -> aexp -> (aexp * Interval.t) list  
+= fun a1 a2 lst -> match a1, a2 with 
+  | Const n, Const m ->  
+  | Var s, Const n
+  | Const n, Var s -> aux_bexp a2 a1 
+
+(* for all variable to have interal with considering relations. *)
+and transposition : aexp -> aexp -> (aexp * aexp)
 
 let analyze : Cfg.t -> Table.t
 = fun g -> Table.init g in (* Every node has a bottom here.*) 
