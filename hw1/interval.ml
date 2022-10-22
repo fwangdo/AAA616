@@ -584,7 +584,7 @@ let rec execute : cmd -> AbsMem.t -> AbsMem.t
 and execute_aexp : aexp -> AbsMem.t -> Interval.t 
 = fun exp mem -> match exp with 
   | Const i -> Interval.alpha i 
-  | Var s -> VarMap.find s mem 
+  | Var s -> AbsMap.find s mem 
   | Plus (a1, a2) -> Interval.add (execute_aexp a1) (execute_aexp a2)
   | Mult (a1, a2) -> Interval.mul (execute_aexp a1) (execute_aexp a2)
   | Sub  (a1, a2) -> Interval.sub (execute_aexp a1) (execute_aexp a2)
@@ -603,12 +603,18 @@ and exeucte_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
 (* consider relations between variables in eq, le. *)
 and aux_bexp : aexp -> aexp -> (aexp * Interval.t) list  
 = fun a1 a2 lst -> match a1, a2 with 
-  | Const n, Const m ->  
-  | Var s, Const n
-  | Const n, Var s -> aux_bexp a2 a1 
+  | Const n1, Const n2 -> lst   
+  | Var s, Const n -> (s, Interval.alpha n)::lst  
+  | Const n, Var s -> aux_bexp a2 a1 lst 
+  | _, _           -> raise (Failure "Undefined")
+  (* this part is for general cases.
+  | Var s1, Var s2 -> let lst' = (s1)::lst
+  | Var s1, aexp   ->
+  | aexp, Var s2   -> aux_bexp a2 a1 lst
+  | aexp1, aexp2   -> *)
 
 (* for all variable to have interal with considering relations. *)
-and transposition : aexp -> aexp -> (aexp * aexp)
+(* and transposition : aexp -> aexp -> (aexp * aexp) *)
 
 let analyze : Cfg.t -> Table.t
 = fun g -> Table.init g in (* Every node has a bottom here.*) 
