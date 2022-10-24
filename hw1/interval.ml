@@ -570,9 +570,11 @@ module Table : Table = struct
     prerr_endline "") t  
 end
 
-let fold_update : (f * aexp * Interval.t) -> AbsMem.t -> AbsMem.t
+let fold_update : (f * (aexp * Interval.t)) -> AbsMem.t -> AbsMem.t
 = fun (var, iv) mem -> let before = AbsMem.find var mem in 
   VarMap.update var (f before iv) mem
+
+let 
 
 (* it needs to consider a case where r-value has variables.*)
 let rec execute : cmd -> AbsMem.t -> AbsMem.t
@@ -600,7 +602,7 @@ and exeucte_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
   | Equal (a1, a2) -> if not then (* it's negation case *)  
                       else List.fold_right fold_update (aux_bexp a1 a2) mem 
   | Le    (a1, a2) -> if not then execute_bexp Le(Plus(a2, 1), a1) mem false 
-                      else List.fold_right fold_update (aux_bexp a1 a2) mem 
+                      else List.fold_right fold_update ((*TODO*),(aux_bexp a1 a2)) mem (* bug, dont change order.*) 
   | Not   b        -> execute_bexp b mem (if not then false else true) (* then -> double negation. *)  
   | And   (b1, b2) -> if not then let mem' = execute_bexp b1 mem not in let mem'' = execute_bexp b2 mem not in AbsMem.join mem' mem''  
                       else let mem' = execute_bexp b1 mem not in execute_bexp b2 mem' not 
