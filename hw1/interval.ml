@@ -222,8 +222,8 @@ module AbsBool : AbsBool = struct
 end
 
 module type Interval = sig
-  type atom
-  type t 
+  type atom = Const of int | N_inf | P_inf
+  type t = Bot | Top | Interval of atom * atom  
   val bottom : t
   val to_string : t -> string
   val alpha : int -> t 
@@ -417,7 +417,7 @@ module Interval : Interval = struct
                                 | Const 0 -> Const 0 
                                 | Const n -> if 0 < n then N_inf else P_inf)
     | Const a', Const b' -> Const (a' * b') 
-  (* Need to consider 2 inclusion cases and 2 intersection cases. *)
+  (* Need to consider n' = Interval.alpha  2 inclusion cases and 2 intersection cases. *)
   let rec intersection : t -> t -> bool
   = fun a b -> match a, b with 
     | Interval(a1, a2), Interval(b1, b2) -> 
@@ -570,11 +570,9 @@ module Table : Table = struct
     prerr_endline "") t  
 end
 
-let fold_update : (f * (aexp * Interval.t)) -> AbsMem.t -> AbsMem.t
+(* let fold_update : (f * (aexp * Interval.t)) -> AbsMem.t -> AbsMem.t
 = fun (var, iv) mem -> let before = AbsMem.find var mem in 
-  VarMap.update var (f before iv) mem
-
-let 
+  VarMap.update var (f before iv) mem *)
 
 (* it needs to consider a case where r-value has variables.*)
 let rec execute : cmd -> AbsMem.t -> AbsMem.t
@@ -585,7 +583,7 @@ let rec execute : cmd -> AbsMem.t -> AbsMem.t
                           VarMap.update s1 update_aux mem  
   (* CFG should be separated into several conditions when bool expression's' are in condition of while.*)
   (* We assume a situation where we have a very well seperate cfg. so handle a case where it has just a one bool exp. *)
-  | I_assume b -> 
+  | I_assume b -> raise (Failure "undefined yet") 
 (* we need to caculate values of aexp but value in vars are abstracted *)
 and execute_aexp : aexp -> AbsMem.t -> Interval.t 
 = fun exp mem -> match exp with 
@@ -599,10 +597,17 @@ and exeucte_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
 = fun exp mem not -> match exp with (* n_not means the number of not *) 
   | True           -> mem 
   | False          -> mem 
-  | Equal (a1, a2) -> if not then (* it's negation case *)  
-                      else List.fold_right fold_update (aux_bexp a1 a2) mem 
+  (* | Equal (a1, a2) -> if not 
+                      then (match a1, a2 with
+                        | Const a1', Const a2' -> mem (* To-Do. think about whether this case is bottom or not*) 
+                        | Var s, Const n -> let s' = AbsMem.find s mem in 
+                                            let n' = Interval.alpha in if Interval.intersection s' n' 
+                                                                       then let Interval.Interval(i1, i2) -> s' in if i1 = Interval.N_inf then Interval(N_inf, Const)    
+                                                                       else mem   
+                          )  
+                      else List.fold_right fold_update (aux_bexp a1 a2) mem'  
   | Le    (a1, a2) -> if not then execute_bexp Le(Plus(a2, 1), a1) mem false 
-                      else List.fold_right fold_update ((*TODO*),(aux_bexp a1 a2)) mem (* bug, dont change order.*) 
+                      else List.fold_right fold_update ((*TODO*),(aux_bexp a1 a2)) mem (* bug, dont change order.*) *) 
   | Not   b        -> execute_bexp b mem (if not then false else true) (* then -> double negation. *)  
   | And   (b1, b2) -> if not then let mem' = execute_bexp b1 mem not in let mem'' = execute_bexp b2 mem not in AbsMem.join mem' mem''  
                       else let mem' = execute_bexp b1 mem not in execute_bexp b2 mem' not 
@@ -619,11 +624,12 @@ and aux_bexp : aexp -> aexp -> (aexp * Interval.t) list
   | aexp, Var s2   -> aux_bexp a2 a1 lst
   | aexp1, aexp2   ->  *)
 
+
 (* for all variable to have interal with considering relations. *)
 (* and transposition : aexp -> aexp -> (aexp * aexp) *)
 
 let analyze : Cfg.t -> Table.t
-= fun g -> Table.init g in (* Every node has a bottom here.*) 
+= fun g -> let init_talbe = Table.init g in raise (Failure "undefined")(* Every node has a bottom here.*) 
 
 
 let pgm = 
@@ -636,6 +642,9 @@ let pgm =
         Assign ("y", Plus (Var "y", Const 1)); 
       ]);
   ]
+
+(* additional examples *)
+
 
 let cfg = cmd2cfg pgm 
 let _ = Cfg.print cfg
