@@ -222,8 +222,8 @@ module AbsBool : AbsBool = struct
 end
 
 module type Interval = sig
-  type atom = Const of int | N_inf | P_inf
-  type t = Bot | Top | Interval of atom * atom  
+  type atom = Con of int | N_inf | P_inf
+  type t = Bot | Top | Iv of atom * atom  
   val bottom : t
   val to_string : t -> string
   val alpha : int -> t 
@@ -244,15 +244,15 @@ module type Interval = sig
 end
 
 module Interval : Interval = struct
-  type atom = Const of int | N_inf | P_inf
+  type atom = Con of int | N_inf | P_inf
   (* N_inf means negative infinite, P_int means postiive negative.*)
-  type t = Bot | Top | Interval of atom * atom  
+  type t = Bot | Top | Iv of atom * atom  
 
   let bottom = Bot 
 
   let string_of_atom : atom -> string
   = fun a -> match a with 
-    | Const i1 -> string_of_int i1 
+    | Con i1 -> string_of_int i1 
     | N_inf -> "-oo"
     | P_inf -> "+oo"
 
@@ -260,19 +260,19 @@ module Interval : Interval = struct
   = fun i -> match i with 
     | Bot -> "Bottom" 
     | Top -> "Top"
-    | Interval(i1, i2) -> let str_i1 = string_of_atom i1 in let str_i2 = string_of_atom i2 in "[" ^ str_i1 ^ ", " ^ str_i2 ^ "]"
+    | Iv(i1, i2) -> let str_i1 = string_of_atom i1 in let str_i2 = string_of_atom i2 in "[" ^ str_i1 ^ ", " ^ str_i2 ^ "]"
 
   (* I guess this function is for abstracting concrete values. *)
   let alpha : int -> t 
-  = fun n -> Interval(Const n, Const n)  
+  = fun n -> Iv(Con n, Con n)  
 
   (* (-inf, n) *)
   let alpha_to : int -> t 
-  = fun n -> Interval(N_inf, Const n)
+  = fun n -> Iv(N_inf, Con n)
 
   (* (n, inf) *)
   let alpha_from : int -> t
-  = fun n -> Interval(Const n, P_inf)
+  = fun n -> Iv(Con n, P_inf)
 
   (* order for atom. only if something located in right is greater than left one, then return value would be true*)
   let comp : atom -> atom -> bool 
@@ -281,7 +281,7 @@ module Interval : Interval = struct
     | P_inf, _ -> false 
     | N_inf, _ -> true 
     | _, N_inf -> false 
-    | Const x, Const y -> if x <= y then true else false 
+    | Con x, Con y -> if x <= y then true else false 
 
   let interval_min = fun a b -> if comp a b then a else b 
 
@@ -295,7 +295,7 @@ module Interval : Interval = struct
     | _, Top -> true
     | Top, _ -> false  
     (* interval cases. thinks about inf cases frist!*)
-    | Interval(a1, a2), Interval(b1, b2) -> if (comp b1 a1) && (comp a2 b2) then true else false 
+    | Iv(a1, a2), Iv(b1, b2) -> if (comp b1 a1) && (comp a2 b2) then true else false 
 
   (* okay *)
   let join a b = match a, b with
@@ -304,10 +304,10 @@ module Interval : Interval = struct
     | Top, _ -> Top 
     | _, Top -> Top 
      (* interval cases. thinks about inf cases frist!*)
-    | Interval(a1, a2), Interval(b1, b2) -> if (comp a1 b1) && (comp a2 b2) then Interval(a1, b2) 
-                                            else if (comp a1 b1) && (comp b2 a2) then Interval(a1, a2)
-                                            else if (comp b1 a1) && (comp a2 b2) then Interval(b1, b2)
-                                            else if (comp b1 a1) && (comp b2 a2) then Interval(b1, a2)
+    | Iv(a1, a2), Iv(b1, b2) -> if (comp a1 b1) && (comp a2 b2) then Iv(a1, b2) 
+                                            else if (comp a1 b1) && (comp b2 a2) then Iv(a1, a2)
+                                            else if (comp b1 a1) && (comp a2 b2) then Iv(b1, b2)
+                                            else if (comp b1 a1) && (comp b2 a2) then Iv(b1, a2)
                                             else raise (Failure "Error: Impossible case in join")
    
   (* okay *)
@@ -316,10 +316,10 @@ module Interval : Interval = struct
     | _, Bot -> Bot
     | Top, y -> y 
     | x, Top -> x 
-    | Interval(a1, a2), Interval(b1, b2) -> if (comp a1 b1) && (comp a2 b2) then if comp b1 a2 then Interval(b1, a2) else Bot (* intersection case *)
-                                            else if (comp a1 b1) && (comp b2 a2) then Interval(b1, b2) (* this case is in situation where b is included in a.*)
-                                            else if (comp b1 a1) && (comp a2 b2) then Interval(a1, a2) (* this case is in situation where a is included in b.*)
-                                            else if (comp b1 a1) && (comp b2 a2) then if comp a1 b2 then Interval(a1, b2) else Bot (* intersection case *)
+    | Iv(a1, a2), Iv(b1, b2) -> if (comp a1 b1) && (comp a2 b2) then if comp b1 a2 then Iv(b1, a2) else Bot (* intersection case *)
+                                            else if (comp a1 b1) && (comp b2 a2) then Iv(b1, b2) (* this case is in situation where b is included in a.*)
+                                            else if (comp b1 a1) && (comp a2 b2) then Iv(a1, a2) (* this case is in situation where a is included in b.*)
+                                            else if (comp b1 a1) && (comp b2 a2) then if comp a1 b2 then Iv(a1, b2) else Bot (* intersection case *)
                                             else raise (Failure "Error: Impossible case in meet")
  
   (* this will be executed on x (widen) f(x). *)
@@ -328,18 +328,18 @@ module Interval : Interval = struct
     | x, Bot -> x
     | Top, _ -> Top (* need to know more *) 
     | _, Top -> Top (* need to know more *)
-    | Interval(a1, a2), Interval(b1, b2) -> let new_a = if (comp b1 a1) then N_inf else a1 in 
+    | Iv(a1, a2), Iv(b1, b2) -> let new_a = if (comp b1 a1) then N_inf else a1 in 
                                             let new_b = if (comp a2 b2) then P_inf else b1 in 
-                                            Interval(new_a, new_b)
+                                            Iv(new_a, new_b)
  
   let narrow a b = match (a, b) with 
     | Bot, _ -> Bot 
     | _, Bot -> Bot  
     | Top, y -> y (* need to know more *) 
     | x, Top -> x (* need to know more *)
-    | Interval(a1, a2), Interval(b1, b2) -> let new_a = if (a1 = N_inf) then b1 else a1 in 
+    | Iv(a1, a2), Iv(b1, b2) -> let new_a = if (a1 = N_inf) then b1 else a1 in 
                                             let new_b = if (a2 = P_inf) then b2 else a2 in 
-                                            Interval(new_a, new_b)
+                                            Iv(new_a, new_b)
  
   (* okay *)
   let add a b = match (a, b) with 
@@ -347,20 +347,20 @@ module Interval : Interval = struct
     | _, Bot -> Bot  
     | Top, _ -> Top 
     | _, Top -> Top 
-    | Interval(a1, a2), Interval(b1, b2) -> 
+    | Iv(a1, a2), Iv(b1, b2) -> 
       let new_a = (match a1, b1 with 
         | P_inf, _ -> raise (Failure "P_inf is located in left of range.") (* this case is impossible because of widening definition *)
         | _, P_inf -> raise (Failure "P_inf is located in left of range.") (* this case is impossible because of widening definition *)
         | N_inf, _ -> N_inf 
         | _, N_inf -> N_inf 
-        | Const a1', Const b1' -> Const (a1' + b1')) in 
+        | Con a1', Con b1' -> Con (a1' + b1')) in 
       let new_b = (match a2, b2 with 
         | N_inf, _ -> raise (Failure "N_inf is located in right of range.") (* this case is impossible because of widening definition *) 
         | _, N_inf -> raise (Failure "N_inf is located in right of range.") (* this case is impossible because of widening definition *)
         | P_inf, _ -> P_inf
         | _, P_inf -> P_inf
-        | Const a2', Const b2' -> Const (a2' + b2')) in 
-        Interval(new_a, new_b) 
+        | Con a2', Con b2' -> Con (a2' + b2')) in 
+        Iv(new_a, new_b) 
 
   (* okay *)
   let sub a b = match (a, b) with 
@@ -368,20 +368,20 @@ module Interval : Interval = struct
     | _, Bot -> Bot  
     | Top, _ -> Top 
     | _, Top -> Top 
-    | Interval(a1, a2), Interval(b1, b2) -> 
+    | Iv(a1, a2), Iv(b1, b2) -> 
       let new_a = (match a1, b2 with (* minimum case: a1 - b2 *) 
         | P_inf, _ -> raise (Failure "P_inf is located in left of range.") (* this case is impossible because of widening definition *)
         | _, N_inf -> raise (Failure "N_inf is located in right of range.") (* this case is impossible because of widening definition *)
         | N_inf, _ -> N_inf 
         | _, P_inf -> N_inf 
-        | Const a1', Const b1' -> Const (a1' - b1')) in 
+        | Con a1', Con b1' -> Con (a1' - b1')) in 
       let new_b = (match a2, b1 with (* maximum case: a2 - b1 *) 
         | N_inf, _ -> raise (Failure "N_inf is located in right of range.") (* this case is impossible because of widening definition *) 
         | _, P_inf -> raise (Failure "P_inf is located in left of range.") (* this case is impossible because of widening definition *)
         | P_inf, _ -> P_inf
         | _, N_inf -> P_inf
-        | Const a2', Const b2' -> Const (a2' - b2')) in 
-        Interval(new_a, new_b) 
+        | Con a2', Con b2' -> Con (a2' - b2')) in 
+        Iv(new_a, new_b) 
 
   (* in this part, we should consider order between new_a and new_b *)
   (*
@@ -395,39 +395,39 @@ module Interval : Interval = struct
   let rec mul a b = match (a, b) with  
     | Bot, _ -> Bot 
     | _, Bot -> Bot  
-    (* | Interval(Const 0, Const 0), _ -> Interval(Const 0, Const 0)
-    | _, Interval(Const 0, Const 0) -> Interval(Const 0, Const 0) *)
+    (* | Iv(Con 0, Con 0), _ -> Iv(Con 0, Con 0)
+    | _, Iv(Con 0, Con 0) -> Iv(Con 0, Con 0) *)
     | Top, _ -> Top 
     | _, Top -> Top 
-    | Interval(a1, a2), Interval(b1, b2) -> let t1 = mul_aux a1 b1 in let t2 = mul_aux a1 b2 in let t3 = mul_aux a2 b1 in let t4 = mul_aux a2 b2 in 
+    | Iv(a1, a2), Iv(b1, b2) -> let t1 = mul_aux a1 b1 in let t2 = mul_aux a1 b2 in let t3 = mul_aux a2 b1 in let t4 = mul_aux a2 b2 in 
                                             let candidate = [t1;t2;t3;t4] in 
                                             let c1 = List.fold_right interval_min candidate t1 in 
                                             let c2 = List.fold_right interval_max candidate t1 in
-                                            Interval(c1, c2)
+                                            Iv(c1, c2)
   and mul_aux : atom -> atom -> atom 
   = fun a b -> match a, b with 
     | P_inf, z' | z', P_inf -> (match z' with
                                 | P_inf -> P_inf
                                 | N_inf -> N_inf
-                                | Const 0 -> Const 0 
-                                | Const n -> if 0 < n then P_inf else N_inf)
+                                | Con 0 -> Con 0 
+                                | Con n -> if 0 < n then P_inf else N_inf)
     | N_inf, z' | z', N_inf ->  (match z' with
                                 | P_inf -> N_inf
                                 | N_inf -> P_inf
-                                | Const 0 -> Const 0 
-                                | Const n -> if 0 < n then N_inf else P_inf)
-    | Const a', Const b' -> Const (a' * b') 
+                                | Con 0 -> Con 0 
+                                | Con n -> if 0 < n then N_inf else P_inf)
+    | Con a', Con b' -> Con (a' * b') 
   (* Need to consider n' = Interval.alpha  2 inclusion cases and 2 intersection cases. *)
   let rec intersection : t -> t -> bool
   = fun a b -> match a, b with 
-    | Interval(a1, a2), Interval(b1, b2) -> 
+    | Iv(a1, a2), Iv(b1, b2) -> 
       if comp a1 b1 then (if comp b2 a2 then true else (if comp b1 a2 then true else false))
       else if comp b1 a1 then (if comp a2 b2 then true else (if comp a1 b2 then true else false))
       else false 
     | _ -> false
 
   (* 
-     True  -> Only if a1 = a2 = a3 = a4 in const. 
+     True  -> Only if a1 = a2 = a3 = a4 in Con. 
      False -> case for no intersection
      Top   -> otherwise. it means there is an intersection.
   *)
@@ -436,7 +436,7 @@ module Interval : Interval = struct
     | _, Bot -> AbsBool.Bot  
     | Top, _ -> AbsBool.Top 
     | _, Top -> AbsBool.Top 
-    | Interval(Const a1, Const a2), Interval(Const b1, Const b2) -> 
+    | Iv(Con a1, Con a2), Iv(Con b1, Con b2) -> 
       if (a1 = a2) && (a2 = b1) && (b1 = b2) then AbsBool.True
       else if intersection a b then AbsBool.Top else AbsBool.False
     | x, y -> if intersection x y then AbsBool.Top else AbsBool.False 
@@ -452,7 +452,7 @@ module Interval : Interval = struct
     | _, Bot -> AbsBool.Bot
     | Top, _ -> AbsBool.Top
     | _, Top -> AbsBool.Top
-    | Interval(a1, a2), Interval(b1, b2) -> 
+    | Iv(a1, a2), Iv(b1, b2) -> 
       if comp a2 b1 then AbsBool.True else (* this one includes a2 == b1 case.*)
         if intersection a b then AbsBool.Top else AbsBool.False  (* b1 is less than a2 without intersection. it means whole range of b is less then range of a. *)
 
@@ -461,7 +461,7 @@ module Interval : Interval = struct
     | _, Bot -> AbsBool.Bot
     | Top, _ -> AbsBool.Top
     | _, Top -> AbsBool.Top
-    | Interval(a1, a2), Interval(b1, b2) -> 
+    | Iv(a1, a2), Iv(b1, b2) -> 
       if comp b2 a1 then AbsBool.True else (* this one includes a2 == b1 case.*)
         if intersection a b then AbsBool.Top else AbsBool.False  (* b1 is less than a2 without intersection. it means whole range of b is less then range of a. *)
 end
@@ -575,19 +575,24 @@ end
   VarMap.update var (f before iv) mem *)
 
 let handle_le : Interval.t -> int -> bool -> Interval.t
-= fun iv i ord -> match iv with (* if ord is true, then x <= iv, else iv <= x *)
+= fun iv i ord -> 
+  let ii = Interval.Con i in 
+  let ip = Interval.Con(i+1) in
+  let im = Interval.Con(i-1) in
+  match iv with (* if ord is true, then x <= iv, else iv <= x *)
   | Interval.Bot -> Interval.Bot
-  | Interval.Top -> if ord then Interval.Interval(Interval.N_inf, (Interval.Const i)) else Interval.Interval((Interval.Const i), Interval.P_inf)
-  | Interval.Interval(i1, i2) -> if ord then (if i1 > i then Interval.Bot else (if i2 < i then i else Interval.Interval(i1, i))) 
-                                 else (if i2 < i then Interval.Bot else (if i1 > i then i else Interval.Interval(i, i2)))
+  | Interval.Top -> if ord then Interval.Iv(Interval.N_inf, (Interval.Con i)) else Interval.Iv((Interval.Con i), Interval.P_inf)
+  | Interval.Iv(i1, i2) -> if ord then (if (Interval.comp ip i1) then Interval.Bot else (if (Interval.comp i2 im) then iv else Interval.Iv(i1, ii))) 
+                                  else (if (Interval.comp i2 im) then Interval.Bot else (if (Interval.comp ip i1) then iv else Interval.Iv(ii, i2)))
 
+let update_option a = function | None -> None | Some x -> Some a  
+                      
 (* it needs to consider a case where r-value has variables.*)
-let rec execute : cmd -> AbsMem.t -> AbsMem.t
+let rec execute : Node.instr -> AbsMem.t -> AbsMem.t
 = fun cmd mem -> match cmd with 
   | I_skip -> mem  
-  | I_assign (s1, a2) ->  let a2' = execute_aexp a2 in 
-                          let update_aux a = function | None -> None | Some x -> Some a2' in  
-                          VarMap.update s1 update_aux mem  
+  | I_assign (s1, a2) ->  let a2' = execute_aexp a2 mem in 
+                          VarMap.update s1 (update_option a2') mem  
   (* CFG should be separated into several conditions when bool expression's' are in condition of while.*)
   (* We assume a situation where we have a very well seperate cfg. so handle a case where it has just a one bool exp. *)
   | I_assume b -> raise (Failure "undefined yet") 
@@ -595,30 +600,32 @@ let rec execute : cmd -> AbsMem.t -> AbsMem.t
 and execute_aexp : aexp -> AbsMem.t -> Interval.t 
 = fun exp mem -> match exp with 
   | Const i -> Interval.alpha i 
-  | Var s -> AbsMap.find s mem 
-  | Plus (a1, a2) -> Interval.add (execute_aexp a1) (execute_aexp a2)
-  | Mult (a1, a2) -> Interval.mul (execute_aexp a1) (execute_aexp a2)
-  | Sub  (a1, a2) -> Interval.sub (execute_aexp a1) (execute_aexp a2)
+  | Var s -> AbsMem.find s mem 
+  | Plus (a1, a2) -> Interval.add (execute_aexp a1 mem) (execute_aexp a2 mem)
+  | Mult (a1, a2) -> Interval.mul (execute_aexp a1 mem) (execute_aexp a2 mem)
+  | Sub  (a1, a2) -> Interval.sub (execute_aexp a1 mem) (execute_aexp a2 mem)
 (* this one will return memory itself.*)
-and exeucte_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
+and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
 = fun exp mem not -> match exp with (* n_not means the number of not *) 
   | True           -> mem 
   | False          -> mem 
-  | Equal (a1, a2) -> match a1, a2 with
+  | Equal (a1, a2) -> (match a1, a2 with
                       | Const n1, Const n2 -> mem (* bottom? or normal execution? *)
-                      | Const n, Var s -> execute_bexp Equal(a2, a1) mem not 
+                      | Const n, Var s -> execute_bexp (Equal(a2, a1)) mem not 
                       | Var s, Const n ->
                         if not 
-                        then VarMap.update s Interval.Top mem  
-                        else VarMap.update s (Interval.alpha n) mem  
-  | Le    (a1, a2) -> match a1, a2 with
+                        then VarMap.update s (update_option Interval.Top) mem  
+                        else VarMap.update s (update_option (Interval.alpha n)) mem
+                      | _, _ -> raise (Failure "undefined"))  
+  | Le    (a1, a2) -> (match a1, a2 with
                       | Const n1, Const n2 -> mem (* bottom? or normal execution? *)
                       | Const n, Var s -> 
-                        if not then execute_bexp Le(Var s, Const(n-1)) mem false  
-                               else let new_iv = (handle_le (AbsMem.find s mem) n false) in VarMap.update s new_iv mem 
+                        if not then execute_bexp (Le(Var s, Const(n-1))) mem false  
+                               else let new_iv = (handle_le (AbsMem.find s mem) n false) in VarMap.update s (update_option new_iv) mem 
                       | Var s, Const n ->
-                        if not then execute_bexp Le(Const(n+1), Var s) mem false  
-                               else let new_iv = (handle_le (AbsMem.find s mem) n true) in VarMap.update s new_iv mem 
+                        if not then execute_bexp (Le(Const(n+1), Var s)) mem false  
+                               else let new_iv = (handle_le (AbsMem.find s mem) n true) in VarMap.update s (update_option new_iv) mem
+                      | _, _ -> raise (Failure "undefined")) 
   | Not   b        -> execute_bexp b mem (if not then false else true) (* then -> double negation. *)  
   | And   (b1, b2) -> if not then let mem' = execute_bexp b1 mem not in let mem'' = execute_bexp b2 mem not in AbsMem.join mem' mem''  
                       else let mem' = execute_bexp b1 mem not in execute_bexp b2 mem' not 
