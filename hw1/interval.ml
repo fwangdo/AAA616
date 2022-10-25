@@ -613,11 +613,11 @@ and aux_bexp : aexp -> aexp -> (aexp * Interval.t) list
   | Var s, Const n -> (s, Interval.alpha n)::lst  
   | Const n, Var s -> aux_bexp a2 a1 lst 
   | _, _           -> raise (Failure "Undefined")
-  (* this part is for general cases.
-  | Var s1, Var s2 -> let lst' = (s1)::lst
+  (* this part is for general cases. *)
+  (* | Var s1, Var s2 -> let lst' = (s1)::lst
   | Var s1, aexp   ->
   | aexp, Var s2   -> aux_bexp a2 a1 lst
-  | aexp1, aexp2   -> *)
+  | aexp1, aexp2   ->  *)
 
 (* for all variable to have interal with considering relations. *)
 (* and transposition : aexp -> aexp -> (aexp * aexp) *)
@@ -638,7 +638,7 @@ let pgm =
   ]
 
 let cfg = cmd2cfg pgm 
-(* let _ = Cfg.print cfg
-let _ = Cfg.dot cfg *)
+let _ = Cfg.print cfg
+let _ = Cfg.dot cfg
 (* let table = analyze cfg 
 let _ = Table.print table *)
