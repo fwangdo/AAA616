@@ -574,6 +574,13 @@ end
 = fun (var, iv) mem -> let before = AbsMem.find var mem in 
   VarMap.update var (f before iv) mem *)
 
+let handle_le : Interval.t -> int -> bool -> Interval.t
+= fun iv i ord -> match iv with (* if ord is true, then x <= iv, else iv <= x *)
+  | Interval.Bot -> Interval.Bot
+  | Interval.Top -> if ord then Interval.Interval(Interval.N_inf, (Interval.Const i)) else Interval.Interval((Interval.Const i), Interval.P_inf)
+  | Interval.Interval(i1, i2) -> if ord then (if i1 > i then Interval.Bot else (if i2 < i then i else Interval.Interval(i1, i))) 
+                                 else (if i2 < i then Interval.Bot else (if i1 > i then i else Interval.Interval(i, i2)))
+
 (* it needs to consider a case where r-value has variables.*)
 let rec execute : cmd -> AbsMem.t -> AbsMem.t
 = fun cmd mem -> match cmd with 
@@ -597,40 +604,41 @@ and exeucte_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
 = fun exp mem not -> match exp with (* n_not means the number of not *) 
   | True           -> mem 
   | False          -> mem 
-  (* | Equal (a1, a2) -> if not 
-                      then (match a1, a2 with
-                        | Const a1', Const a2' -> mem (* To-Do. think about whether this case is bottom or not*) 
-                        | Var s, Const n -> let s' = AbsMem.find s mem in 
-                                            let n' = Interval.alpha in if Interval.intersection s' n' 
-                                                                       then let Interval.Interval(i1, i2) -> s' in if i1 = Interval.N_inf then Interval(N_inf, Const)    
-                                                                       else mem   
-                          )  
-                      else List.fold_right fold_update (aux_bexp a1 a2) mem'  
-  | Le    (a1, a2) -> if not then execute_bexp Le(Plus(a2, 1), a1) mem false 
-                      else List.fold_right fold_update ((*TODO*),(aux_bexp a1 a2)) mem (* bug, dont change order.*) *) 
+  | Equal (a1, a2) -> match a1, a2 with
+                      | Const n1, Const n2 -> mem (* bottom? or normal execution? *)
+                      | Const n, Var s -> execute_bexp Equal(a2, a1) mem not 
+                      | Var s, Const n ->
+                        if not 
+                        then VarMap.update s Interval.Top mem  
+                        else VarMap.update s (Interval.alpha n) mem  
+  | Le    (a1, a2) -> match a1, a2 with
+                      | Const n1, Const n2 -> mem (* bottom? or normal execution? *)
+                      | Const n, Var s -> 
+                        if not then execute_bexp Le(Var s, Const(n-1)) mem false  
+                               else let new_iv = (handle_le (AbsMem.find s mem) n false) in VarMap.update s new_iv mem 
+                      | Var s, Const n ->
+                        if not then execute_bexp Le(Const(n+1), Var s) mem false  
+                               else let new_iv = (handle_le (AbsMem.find s mem) n true) in VarMap.update s new_iv mem 
   | Not   b        -> execute_bexp b mem (if not then false else true) (* then -> double negation. *)  
   | And   (b1, b2) -> if not then let mem' = execute_bexp b1 mem not in let mem'' = execute_bexp b2 mem not in AbsMem.join mem' mem''  
                       else let mem' = execute_bexp b1 mem not in execute_bexp b2 mem' not 
 (* consider relations between variables in eq, le. *)
-and aux_bexp : aexp -> aexp -> (aexp * Interval.t) list  
+(* and aux_bexp : aexp -> aexp -> (aexp * Interval.t) list  
 = fun a1 a2 lst -> match a1, a2 with 
   | Const n1, Const n2 -> lst   
   | Var s, Const n -> (s, Interval.alpha n)::lst  
   | Const n, Var s -> aux_bexp a2 a1 lst 
   | _, _           -> raise (Failure "Undefined")
-  (* this part is for general cases. *)
-  (* | Var s1, Var s2 -> let lst' = (s1)::lst
+  | Var s1, Var s2 -> let lst' = (s1)::lst
   | Var s1, aexp   ->
   | aexp, Var s2   -> aux_bexp a2 a1 lst
-  | aexp1, aexp2   ->  *)
-
+  | aexp1, aexp2   ->   *)
 
 (* for all variable to have interal with considering relations. *)
 (* and transposition : aexp -> aexp -> (aexp * aexp) *)
 
 let analyze : Cfg.t -> Table.t
 = fun g -> let init_talbe = Table.init g in raise (Failure "undefined")(* Every node has a bottom here.*) 
-
 
 let pgm = 
   Seq [
