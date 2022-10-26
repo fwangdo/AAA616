@@ -553,7 +553,7 @@ module type Table = sig
   val empty : t
   val add : Node.t -> AbsMem.t -> t -> t
   val init : Node.t list -> t 
-  val find : Node.t -> t -> AbsMem.t 
+  val find : Node.t -> t:t -> AbsMem.t 
   val print : t -> unit
 end 
 
@@ -562,8 +562,8 @@ module Table : Table = struct
   let empty = NodeMap.empty 
   let add = NodeMap.add
   let init ns = List.fold_right (fun n -> add n AbsMem.empty) ns empty
-  let find : Node.t -> t -> AbsMem.t 
-  =fun n t -> try NodeMap.find n t with _ -> AbsMem.empty
+  let find : Node.t -> t:t -> AbsMem.t 
+  =fun n ~t -> try NodeMap.find n t with _ -> AbsMem.empty
   let print t = NodeMap.iter (fun n m -> 
     prerr_endline (string_of_int (Node.get_nodeid n)); 
     AbsMem.print m; 
@@ -595,7 +595,7 @@ let rec execute : Node.instr -> AbsMem.t -> AbsMem.t
                           VarMap.update s1 (update_option a2') mem  
   (* CFG should be separated into several conditions when bool expression's' are in condition of while.*)
   (* We assume a situation where we have a very well seperate cfg. so handle a case where it has just a one bool exp. *)
-  | I_assume b -> raise (Failure "undefined yet") 
+  | I_assume b -> execute_bexp b mem true  
 (* we need to caculate values of aexp but value in vars are abstracted *)
 and execute_aexp : aexp -> AbsMem.t -> Interval.t 
 = fun exp mem -> match exp with 
@@ -644,19 +644,37 @@ and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
 (* for all variable to have interal with considering relations. *)
 (* and transposition : aexp -> aexp -> (aexp * aexp) *)
 
-module TempMap = Map.Make(Int)
+let rec widening : Node.t list -> Cfg.t -> Table.t -> Table.t
+= fun lst cfg tab -> match lst with 
+  | hd::tl -> let n, ins = hd in 
+              let preds = NodeSet.elements (Cfg.preds (n,ins) cfg) in (* node of predecessors *) 
+              let preds' = List.map (Table.find ~t:tab) preds in  (* AbsMem of predecessors *)
+              let lub = List.fold_right AbsMem.join preds' AbsMem.empty in (* LUB of predecessors *)
+              let s = execute ins lub in (* applying f_hat *) 
+              let b_mem = Table.find hd ~t:tab in 
+              if AbsMem.order s b_mem then widening tl cfg tab 
+              else let n_mem = AbsMem.widen b_mem s in let n_tab = NodeMap.update hd (update_option n_mem) tab in widening (tl@[hd]) cfg n_tab
+  | _      -> tab 
 
-let worklist = ref []
+let rec narrowing : Node.t list -> Cfg.t -> Table.t -> Table.t
+= fun lst cfg tab -> match lst with 
+  | hd::tl -> let n, ins = hd in 
+              let preds = NodeSet.elements (Cfg.preds (n,ins) cfg) in (* node of predecessors *) 
+              let preds' = List.map (Table.find ~t:tab) preds in  (* AbsMem of predecessors *)
+              let lub = List.fold_right AbsMem.join preds' AbsMem.empty in (* LUB of predecessors *)
+              let s = execute ins lub in (* applying f_hat *) 
+              let b_mem = Table.find hd ~t:tab in 
+              if AbsMem.order b_mem s then narrowing tl cfg tab 
+              else let n_mem = AbsMem.narrow b_mem s in let n_tab = NodeMap.update hd (update_option n_mem) tab in narrowing (tl@[hd]) cfg n_tab
+  | _      -> tab 
 
-let widening : Node.t list -> Cfg.t -> AbsMem.t TempMap.t -> AbsMem.t TempMap.t
-= fun lst cfg mem -> match lst with 
-  | (n,ins)::tl -> let preds = NodeSet.elements (Cfg.preds (n,ins) cfg) in let lub = List.fold_right AbsMem.join preds AbsMem.empty in
-                    let s = execute ins in let b_mem = AbsMem.find in 2 
-  | _            -> mem 
-
-(* before starting widening and narrowing, need to add bottom as a predecessor of '0' node *)
-(* let analyze : Cfg.t -> Table.t
-= fun g -> let init_talbe = Table.init g in  *)
+(* before starting widening and narrowing, need to add bottom as a predecessor of '1' node *)
+let analyze : Cfg.t -> Table.t
+= fun g -> let init_table = Table.init @@ Cfg.nodesof g in
+  let worklist = Cfg.nodesof g in 
+  let res_of_widen = widening worklist g init_table in 
+  let res_of_narrow = narrowing worklist g res_of_widen in 
+  res_of_narrow
 
 
 let pgm = 
@@ -676,6 +694,5 @@ let pgm =
 let cfg = cmd2cfg pgm
 (* let _ = Cfg.print cfg *)
 (* let _ = Cfg.dot cfg *)
-(* let lst = Cfg.nodesof cfg in List.fold_right Node.to_string lst ""  *)
-(* let table = analyze cfg 
-let _ = Table.print table *)
+let table = analyze cfg 
+let _ = Table.print table
