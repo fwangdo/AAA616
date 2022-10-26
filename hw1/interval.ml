@@ -483,6 +483,9 @@ end
 module AbsMem : AbsMem = struct
   type t = Interval.t VarMap.t 
 
+  let print m = VarMap.iter (fun x v -> prerr_endline 
+    (x ^ " |-> " ^ Interval.to_string v)) m 
+
   let empty = VarMap.empty
 
   let find x m = try VarMap.find x m with _ -> Interval.bottom 
@@ -491,15 +494,25 @@ module AbsMem : AbsMem = struct
 
   let keys b = List.fold_right (fun (k,v) lst -> k::lst) b []
 
+  let debug : string list -> string -> string 
+  = fun lst s -> match lst with 
+    | hd::tl -> s ^ hd 
+    | _ -> s
+
   let rec union_keys : string list -> string list -> string list 
   = fun a b -> match b with 
     | hd::tl -> if List.mem hd a then union_keys a tl else union_keys (hd::a) tl 
-    | [] -> a 
+    | [] -> (print_endline ("[Union Keys]: " ^ (debug a ""))); a 
 
   let rec calc : (Interval.t -> Interval.t -> Interval.t) -> t -> t -> string list -> t -> t
   = fun f m1 m2 keys m3 -> match keys with
     | hd::tl -> let m2_val = find hd m2 in let m1_val = find hd m1 in 
                 let m3' = add hd (f m1_val m2_val) m3 in
+                (**)
+                let _ = print_endline "[AbsMem keys]"; print_endline hd in
+                let _ = print_endline "[AbsMem join]"; let s_m2 = Interval.to_string m2_val in let s_m1 = Interval.to_string m1_val in print_endline (s_m2 ^ s_m1) in 
+                let _ = print_endline "[AbsMem widen]"; print m3' in 
+                (**)
                 calc f m1 m2 tl m3'
     | _ -> m3
 
@@ -542,9 +555,7 @@ module AbsMem : AbsMem = struct
     let m2_keys = keys m2' in  
     let keys = union_keys m1_keys m2_keys in 
     calc_bool (Interval.order) m1 m2 keys
-  
-  let print m = VarMap.iter (fun x v -> prerr_endline 
-    (x ^ " |-> " ^ Interval.to_string v)) m 
+
 end
 
 
@@ -585,14 +596,15 @@ let handle_le : Interval.t -> int -> bool -> Interval.t
   | Interval.Iv(i1, i2) -> if ord then (if (Interval.comp ip i1) then Interval.Bot else (if (Interval.comp i2 im) then iv else Interval.Iv(i1, ii))) 
                                   else (if (Interval.comp i2 im) then Interval.Bot else (if (Interval.comp ip i1) then iv else Interval.Iv(ii, i2)))
 
-let update_option a = function | None -> None | Some x -> Some a  
+let update_option a = function | None -> Some a | Some x -> Some a  
                       
 (* it needs to consider a case where r-value has variables.*)
 let rec execute : Node.instr -> AbsMem.t -> AbsMem.t
 = fun cmd mem -> match cmd with 
   | I_skip -> mem  
   | I_assign (s1, a2) ->  let a2' = execute_aexp a2 mem in 
-                          VarMap.update s1 (update_option a2') mem  
+                          let n_mem = VarMap.update s1 (update_option a2') mem in 
+                          print_endline "[N_mem]:"; AbsMem.print n_mem; n_mem  
   (* CFG should be separated into several conditions when bool expression's' are in condition of while.*)
   (* We assume a situation where we have a very well seperate cfg. so handle a case where it has just a one bool exp. *)
   | I_assume b -> execute_bexp b mem true  
@@ -651,9 +663,17 @@ let rec widening : Node.t list -> Cfg.t -> Table.t -> Table.t
               let preds' = List.map (Table.find ~t:tab) preds in  (* AbsMem of predecessors *)
               let lub = List.fold_right AbsMem.join preds' AbsMem.empty in (* LUB of predecessors *)
               let s = execute ins lub in (* applying f_hat *) 
+              (**)
+              let _ = print_endline "\n" in
+              let _ = Printf.printf "[Node]: %s \n" (string_of_int n) in  
+              let _ = print_endline ("[LUB]:"); AbsMem.print lub in  
+              let _ = print_endline ("[ S ]:"); AbsMem.print s   in 
+              (**)
               let b_mem = Table.find hd ~t:tab in 
               if AbsMem.order s b_mem then widening tl cfg tab 
-              else let n_mem = AbsMem.widen b_mem s in let n_tab = NodeMap.update hd (update_option n_mem) tab in widening (tl@[hd]) cfg n_tab
+              else let _ = print_endline ("in widening") in 
+                   let n_mem = AbsMem.widen b_mem s in 
+                   let n_tab = NodeMap.update hd (update_option n_mem) tab in widening (tl@[hd]) cfg n_tab
   | _      -> tab 
 
 let rec narrowing : Node.t list -> Cfg.t -> Table.t -> Table.t
@@ -695,4 +715,4 @@ let cfg = cmd2cfg pgm
 (* let _ = Cfg.print cfg *)
 (* let _ = Cfg.dot cfg *)
 let table = analyze cfg 
-let _ = Table.print table
+(* let _ = Table.print table *)
