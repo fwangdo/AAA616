@@ -328,9 +328,9 @@ module Interval : Interval = struct
     | x, Bot -> x
     | Top, _ -> Top (* need to know more *) 
     | _, Top -> Top (* need to know more *)
-    | Iv(a1, a2), Iv(b1, b2) -> let new_a = if (comp b1 a1) then N_inf else a1 in 
-                                            let new_b = if (comp a2 b2) then P_inf else b1 in 
-                                            Iv(new_a, new_b)
+    | Iv(a1, a2), Iv(b1, b2) -> let new_a = if (comp a1 b1) then a1 else N_inf in 
+                                let new_b = if (comp b2 a2) then a2 else P_inf in 
+                                Iv(new_a, new_b)
  
   let narrow a b = match (a, b) with 
     | Bot, _ -> Bot 
@@ -338,8 +338,8 @@ module Interval : Interval = struct
     | Top, y -> y (* need to know more *) 
     | x, Top -> x (* need to know more *)
     | Iv(a1, a2), Iv(b1, b2) -> let new_a = if (a1 = N_inf) then b1 else a1 in 
-                                            let new_b = if (a2 = P_inf) then b2 else a2 in 
-                                            Iv(new_a, new_b)
+                                let new_b = if (a2 = P_inf) then b2 else a2 in 
+                                Iv(new_a, new_b)
  
   (* okay *)
   let add a b = match (a, b) with 
@@ -509,10 +509,10 @@ module AbsMem : AbsMem = struct
     | hd::tl -> let m2_val = find hd m2 in let m1_val = find hd m1 in 
                 let m3' = add hd (f m1_val m2_val) m3 in
                 (**)
-                let _ = print_endline ("[AbsMem m1,m2]" ^ (Interval.to_string m1_val) ^ (Interval.to_string m1_val)) in
+                (* let _ = print_endline ("[AbsMem m1,m2]" ^ (Interval.to_string m1_val) ^ (Interval.to_string m1_val)) in
                 let _ = print_endline "[AbsMem keys]"; print_endline hd in
                 let _ = print_endline "[AbsMem join]"; let s_m3 = Interval.to_string (f m1_val m2_val) in print_endline (s_m3) in 
-                let _ = print_endline "[AbsMem widen]"; print m3' in 
+                let _ = print_endline "[AbsMem widen]"; print m3' in  *)
                 (**)
                 calc f m1 m2 tl m3'
     | _ -> m3
@@ -702,6 +702,12 @@ let rec narrowing : Node.t list -> Cfg.t -> Table.t -> Table.t
               let lub = List.fold_right AbsMem.join preds' AbsMem.empty in (* LUB of predecessors *)
               let s = execute ins lub in (* applying f_hat *) 
               let b_mem = Table.find hd ~t:tab in 
+              (**)
+              (* let _ = print_endline "\n" in
+              let _ = Printf.printf "[Node]: %s \n" (string_of_int n) in 
+              let _ = print_endline ("[LUB]:"); AbsMem.print lub in  
+              let _ = print_endline ("[ S ]:"); AbsMem.print s   in   *)
+              (**)
               if AbsMem.order b_mem s then narrowing tl cfg tab 
               else let n_mem = AbsMem.narrow b_mem s in let n_tab = NodeMap.update hd (update_option n_mem) tab in 
                    let succs = NodeSet.elements (Cfg.succs hd cfg) in narrowing (tl@succs) cfg n_tab
@@ -712,8 +718,8 @@ let analyze : Cfg.t -> Table.t
 = fun g -> let init_table = Table.init @@ Cfg.nodesof g in
   let worklist = Cfg.nodesof g in 
   let f_tab = first_fhat worklist g init_table in
-  let _ = Table.print f_tab in  
   let res_of_widen = widening worklist g f_tab in 
+  (* let _ = print_endline "result of widen"; Table.print res_of_widen in  *)
   let res_of_narrow = narrowing worklist g res_of_widen in 
   res_of_narrow
 
