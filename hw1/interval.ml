@@ -299,16 +299,16 @@ module Interval : Interval = struct
 
   (* okay *)
   let join a b = match a, b with
-    | Bot, _ -> Bot
-    | _, Bot -> Bot
+    | Bot, y -> y
+    | x, Bot -> x
     | Top, _ -> Top 
     | _, Top -> Top 
      (* interval cases. thinks about inf cases frist!*)
     | Iv(a1, a2), Iv(b1, b2) -> if (comp a1 b1) && (comp a2 b2) then Iv(a1, b2) 
-                                            else if (comp a1 b1) && (comp b2 a2) then Iv(a1, a2)
-                                            else if (comp b1 a1) && (comp a2 b2) then Iv(b1, b2)
-                                            else if (comp b1 a1) && (comp b2 a2) then Iv(b1, a2)
-                                            else raise (Failure "Error: Impossible case in join")
+                                else if (comp a1 b1) && (comp b2 a2) then Iv(a1, a2)
+                                else if (comp b1 a1) && (comp a2 b2) then Iv(b1, b2)
+                                else if (comp b1 a1) && (comp b2 a2) then Iv(b1, a2)
+                                else raise (Failure "Error: Impossible case in join")
    
   (* okay *)
   let meet a b = match (a, b) with  
@@ -502,15 +502,16 @@ module AbsMem : AbsMem = struct
   let rec union_keys : string list -> string list -> string list 
   = fun a b -> match b with 
     | hd::tl -> if List.mem hd a then union_keys a tl else union_keys (hd::a) tl 
-    | [] -> (print_endline ("[Union Keys]: " ^ (debug a ""))); a 
+    | [] -> a 
 
   let rec calc : (Interval.t -> Interval.t -> Interval.t) -> t -> t -> string list -> t -> t
   = fun f m1 m2 keys m3 -> match keys with
     | hd::tl -> let m2_val = find hd m2 in let m1_val = find hd m1 in 
                 let m3' = add hd (f m1_val m2_val) m3 in
                 (**)
+                let _ = print_endline ("[AbsMem m1,m2]" ^ (Interval.to_string m1_val) ^ (Interval.to_string m1_val)) in
                 let _ = print_endline "[AbsMem keys]"; print_endline hd in
-                let _ = print_endline "[AbsMem join]"; let s_m2 = Interval.to_string m2_val in let s_m1 = Interval.to_string m1_val in print_endline (s_m2 ^ s_m1) in 
+                let _ = print_endline "[AbsMem join]"; let s_m3 = Interval.to_string (f m1_val m2_val) in print_endline (s_m3) in 
                 let _ = print_endline "[AbsMem widen]"; print m3' in 
                 (**)
                 calc f m1 m2 tl m3'
@@ -524,6 +525,7 @@ module AbsMem : AbsMem = struct
   
   (* m2 is bigger than m1 *)
   let join m1 m2 = 
+    (* let _  = print_endline __FUNCTION__ in  *)
     let m1' = VarMap.bindings m1 in 
     let m2' = VarMap.bindings m2 in 
     let m1_keys = keys m1' in
@@ -532,6 +534,7 @@ module AbsMem : AbsMem = struct
     let m3 = empty in calc (Interval.join) m1 m2 keys m3 
    
   let widen m1 m2 = 
+    (* let _  = print_endline __FUNCTION__ in  *)
     let m1' = VarMap.bindings m1 in 
     let m2' = VarMap.bindings m2 in 
     let m1_keys = keys m1' in
@@ -540,6 +543,7 @@ module AbsMem : AbsMem = struct
     let m3 = empty in calc (Interval.widen) m1 m2 keys m3 
  
   let narrow m1 m2 = 
+    (* let _  = print_endline __FUNCTION__ in  *)
     let m1' = VarMap.bindings m1 in 
     let m2' = VarMap.bindings m2 in 
     let m1_keys = keys m1' in
@@ -549,6 +553,7 @@ module AbsMem : AbsMem = struct
  
   (* only if all cases are true. *)
   let rec order m1 m2 = 
+    (* let _  = print_endline __FUNCTION__ in  *)
     let m1' = VarMap.bindings m1 in 
     let m2' = VarMap.bindings m2 in 
     let m1_keys = keys m1' in
@@ -603,11 +608,10 @@ let rec execute : Node.instr -> AbsMem.t -> AbsMem.t
 = fun cmd mem -> match cmd with 
   | I_skip -> mem  
   | I_assign (s1, a2) ->  let a2' = execute_aexp a2 mem in 
-                          let n_mem = VarMap.update s1 (update_option a2') mem in 
-                          print_endline "[N_mem]:"; AbsMem.print n_mem; n_mem  
+                          let n_mem = VarMap.update s1 (update_option a2') mem in n_mem 
   (* CFG should be separated into several conditions when bool expression's' are in condition of while.*)
   (* We assume a situation where we have a very well seperate cfg. so handle a case where it has just a one bool exp. *)
-  | I_assume b -> execute_bexp b mem true  
+  | I_assume b -> execute_bexp b mem false  
 (* we need to caculate values of aexp but value in vars are abstracted *)
 and execute_aexp : aexp -> AbsMem.t -> Interval.t 
 = fun exp mem -> match exp with 
@@ -655,25 +659,39 @@ and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
 
 (* for all variable to have interal with considering relations. *)
 (* and transposition : aexp -> aexp -> (aexp * aexp) *)
-
-let rec widening : Node.t list -> Cfg.t -> Table.t -> Table.t
+let rec first_fhat : Node.t list -> Cfg.t -> Table.t -> Table.t
 = fun lst cfg tab -> match lst with 
   | hd::tl -> let n, ins = hd in 
               let preds = NodeSet.elements (Cfg.preds (n,ins) cfg) in (* node of predecessors *) 
               let preds' = List.map (Table.find ~t:tab) preds in  (* AbsMem of predecessors *)
+              (* let _ = print_endline ("[Pred of Node " ^ (string_of_int n) ^ "]" ^ (List.fold_right Node.to_string preds "")) in  *)
+              let lub = List.fold_right AbsMem.join preds' AbsMem.empty in (* LUB of predecessors *)
+              let s = execute ins lub in (* applying f_hat *) 
+              let n_tab = NodeMap.update hd (update_option s) tab in first_fhat tl cfg n_tab
+  | _      -> tab 
+
+let rec widening : Node.t list -> Cfg.t -> Table.t -> Table.t
+= fun lst cfg tab -> match lst with 
+  | hd::tl -> let n, ins = hd in 
+              (**)
+              (* let _ = print_endline "\n" in *)
+              (* let _ = Printf.printf "[Node]: %s \n" (string_of_int n) in   *)
+              (**)
+              let preds = NodeSet.elements (Cfg.preds hd cfg) in (* node of predecessors *) 
+              let preds' = List.map (Table.find ~t:tab) preds in  (* AbsMem of predecessors *)
               let lub = List.fold_right AbsMem.join preds' AbsMem.empty in (* LUB of predecessors *)
               let s = execute ins lub in (* applying f_hat *) 
               (**)
-              let _ = print_endline "\n" in
-              let _ = Printf.printf "[Node]: %s \n" (string_of_int n) in  
-              let _ = print_endline ("[LUB]:"); AbsMem.print lub in  
-              let _ = print_endline ("[ S ]:"); AbsMem.print s   in 
+              (* let _ = print_endline ("[LUB]:"); AbsMem.print lub in   *)
+              (* let _ = print_endline ("[ S ]:"); AbsMem.print s   in  *)
               (**)
               let b_mem = Table.find hd ~t:tab in 
               if AbsMem.order s b_mem then widening tl cfg tab 
-              else let _ = print_endline ("in widening") in 
-                   let n_mem = AbsMem.widen b_mem s in 
-                   let n_tab = NodeMap.update hd (update_option n_mem) tab in widening (tl@[hd]) cfg n_tab
+              else let n_mem = AbsMem.widen b_mem s in 
+                   (* let _ = print_endline "[N_mem in widening]" in  *)
+                   (* let _ = AbsMem.print n_mem in  *)
+                   let n_tab = NodeMap.update hd (update_option n_mem) tab in 
+                   let succs = NodeSet.elements (Cfg.succs hd cfg) in widening (tl@succs) cfg n_tab
   | _      -> tab 
 
 let rec narrowing : Node.t list -> Cfg.t -> Table.t -> Table.t
@@ -685,14 +703,17 @@ let rec narrowing : Node.t list -> Cfg.t -> Table.t -> Table.t
               let s = execute ins lub in (* applying f_hat *) 
               let b_mem = Table.find hd ~t:tab in 
               if AbsMem.order b_mem s then narrowing tl cfg tab 
-              else let n_mem = AbsMem.narrow b_mem s in let n_tab = NodeMap.update hd (update_option n_mem) tab in narrowing (tl@[hd]) cfg n_tab
+              else let n_mem = AbsMem.narrow b_mem s in let n_tab = NodeMap.update hd (update_option n_mem) tab in 
+                   let succs = NodeSet.elements (Cfg.succs hd cfg) in narrowing (tl@succs) cfg n_tab
   | _      -> tab 
 
 (* before starting widening and narrowing, need to add bottom as a predecessor of '1' node *)
 let analyze : Cfg.t -> Table.t
 = fun g -> let init_table = Table.init @@ Cfg.nodesof g in
   let worklist = Cfg.nodesof g in 
-  let res_of_widen = widening worklist g init_table in 
+  let f_tab = first_fhat worklist g init_table in
+  let _ = Table.print f_tab in  
+  let res_of_widen = widening worklist g f_tab in 
   let res_of_narrow = narrowing worklist g res_of_widen in 
   res_of_narrow
 
@@ -715,4 +736,4 @@ let cfg = cmd2cfg pgm
 (* let _ = Cfg.print cfg *)
 (* let _ = Cfg.dot cfg *)
 let table = analyze cfg 
-(* let _ = Table.print table *)
+let _ = Table.print table
