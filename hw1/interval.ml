@@ -41,7 +41,7 @@ module type Node = sig
   | I_assign of string * aexp 
   | I_assume of bexp 
   | I_skip
-  type t 
+  type t = int * instr 
   val create_assign : string -> aexp -> t 
   val create_assume : bexp -> t 
   val create_skip : unit -> t 
@@ -644,15 +644,15 @@ and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
 (* for all variable to have interal with considering relations. *)
 (* and transposition : aexp -> aexp -> (aexp * aexp) *)
 
-(* module TempMap = Map.Make(Int) *)
+module TempMap = Map.Make(Int)
 
-(* let worklist = ref []
+let worklist = ref []
 
 let widening : Node.t list -> Cfg.t -> AbsMem.t TempMap.t -> AbsMem.t TempMap.t
 = fun lst cfg mem -> match lst with 
   | (n,ins)::tl -> let preds = NodeSet.elements (Cfg.preds (n,ins) cfg) in let lub = List.fold_right AbsMem.join preds AbsMem.empty in
                     let s = execute ins in let b_mem = AbsMem.find in 2 
-  | _            -> mem *)
+  | _            -> mem 
 
 (* before starting widening and narrowing, need to add bottom as a predecessor of '0' node *)
 (* let analyze : Cfg.t -> Table.t
@@ -674,8 +674,8 @@ let pgm =
 
 
 let cfg = cmd2cfg pgm
-let _ = Cfg.print cfg
-let _ = Cfg.dot cfg
-in let lst = Cfg.nodesof cfg in List.fold_right Node.to_string lst "" 
+(* let _ = Cfg.print cfg *)
+(* let _ = Cfg.dot cfg *)
+(* let lst = Cfg.nodesof cfg in List.fold_right Node.to_string lst ""  *)
 (* let table = analyze cfg 
 let _ = Table.print table *)
