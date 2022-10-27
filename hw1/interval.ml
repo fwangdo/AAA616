@@ -172,27 +172,40 @@ end
   
  lp, ep means loop point and end point
  pr means pred
+ loop means in loop or not.
 *)
+
+let take_pgm : cmd -> cmd list 
+= function | Seq(lst) -> lst | _ -> (raise (Failure "Impossible case"))
 
 let rec cmd2cfg : cmd -> Cfg.t 
 = fun cmd -> let init = Cfg.empty in 
-  let Seq(lst) = cmd in 
+  let lst = take_pgm cmd in 
   let sp' = Node.create_skip() in let ep' = Node.create_skip() in (parsing lst init sp' ep' sp' false) 
 and parsing : cmd list -> Cfg.t -> Node.t -> Node.t -> Node.t -> bool -> Cfg.t   
 = fun smt cfg lp ep pr loop -> match smt with
  | hd::tl -> begin match hd with 
     | Assign (s1, a2)      -> let cur = Node.create_assign s1 a2 in Cfg.add_edge pr cur (parsing tl cfg lp ep cur loop)
     | Seq    (l1)          -> let sp' = Node.create_skip() in let ep' = Node.create_skip() in  
-                              let cfg' = Cfg.add_edge pr sp' cfg in parsing l1 cfg' lp ep' sp' loop 
-    | If     (b1, c2, c3)  -> cfg (*we do not have to handle this case*)
+                              let cfg' = Cfg.add_edge pr sp' cfg in 
+                              if loop then parsing l1 cfg' lp ep' sp' loop 
+                              else let cfg'' = Cfg.add_edge ep' ep cfg' in parsing l1 cfg'' lp ep' sp' loop 
+    | If     (b1, c2, c3)  -> let sp' = Node.create_skip() in let ep' = Node.create_skip() in
+                              let pass = Node.create_assume b1 in let npass = Node.create_assume(Not (b1)) in 
+                              let cfg' = Cfg.add_edge pr sp' cfg in 
+                              let cfg'' = Cfg.add_edge sp' pass cfg' in 
+                              let cfg''' = (parsing [c2] cfg'' lp ep' pass false) in (* this seq is not in loop *) 
+                              let cfg'''' = Cfg.add_edge sp' npass cfg''' in 
+                              let cfg''''' = (parsing [c3] cfg'''' lp ep' npass false) in 
+                              parsing tl cfg''''' lp ep ep' loop  
     | While  (b1, c2)      -> let sp' = Node.create_skip() in let ep' = Node.create_skip() in
-                              let pass = Node.create_assume b1 in let term = Node.create_assume(Not (b1)) in  
+                              let pass = Node.create_assume b1 in let npass = Node.create_assume(Not (b1)) in  
                               let cfg = Cfg.add_edge pr sp' cfg in (* connect 4 to 5*)
                               let cfg' = Cfg.add_edge sp' pass cfg in 
                               let cfg'' = (parsing [c2] cfg' sp' ep pass true) in 
-                              let cfg''' = Cfg.add_edge sp' term cfg'' in
-                              let cfg'''' = (parsing tl cfg''' lp ep' term loop) in 
-                              Cfg.add_edge ep' ep cfg'''' 
+                              let cfg''' = Cfg.add_edge sp' npass cfg'' in
+                              let cfg'''' = (parsing tl cfg''' lp ep' npass loop) in 
+                              Cfg.add_edge ep' ep cfg'''' (* connect 10 to 5 *) 
   end
   | _ -> let cfg' = Cfg.add_edge pr ep cfg in if loop then Cfg.add_edge ep lp cfg' else cfg'
 (****)
@@ -736,9 +749,50 @@ let pgm =
   ]
 
 (* additional examples *)
+let pgm2 = 
+  Seq [
+    Assign ("x", Const 0); 
+    Assign ("y", Const 0);
+    While (Not( Le (Const 10, Var "x")), 
+      Seq [
+        Assign ("x", Plus (Var "x", Const 1)); 
+        Assign ("y", Plus (Var "y", Const 1)); 
+      ]);
+  ]
 
+let pgm3 = 
+  Seq [
+    Assign ("x", Const 0);
+    Assign ("y", Const 0);
+    If (Equal (Var "x", Const 0),
+      Seq [
+        Assign ("x", Plus (Var "x", Const 1)); 
+        Assign ("y", Plus (Var "y", Const 1)); 
+      ],
+      Seq [
+        Assign ("x", Plus (Var "x", Const 2)); 
+        Assign ("y", Plus (Var "y", Const 2)); 
+      ]);
+    Assign ("x", Plus (Var "x", Const 1)); 
+  ]
 
-let cfg = cmd2cfg pgm
+let pgm4 = 
+  Seq [
+    Assign ("x", Const 0);
+    Assign ("y", Const 0);
+    If (Not (Equal (Var "x", Const 0)),
+      Seq [
+        Assign ("x", Plus (Var "x", Const 1)); 
+        Assign ("y", Plus (Var "y", Const 1)); 
+      ],
+      Seq [
+        Assign ("x", Plus (Var "x", Const 2)); 
+        Assign ("y", Plus (Var "y", Const 2)); 
+      ]);
+    Assign ("x", Plus (Var "x", Const 1)); 
+  ]
+
+let cfg = cmd2cfg pgm3
 (* let _ = Cfg.print cfg *)
 (* let _ = Cfg.dot cfg *)
 let table = analyze cfg 
