@@ -202,10 +202,10 @@ and parsing : cmd list -> Cfg.t -> Node.t -> Node.t -> Node.t -> bool -> Cfg.t
                               let pass = Node.create_assume b1 in let npass = Node.create_assume(Not (b1)) in  
                               let cfg = Cfg.add_edge pr sp' cfg in (* connect 4 to 5*)
                               let cfg' = Cfg.add_edge sp' pass cfg in 
-                              let cfg'' = (parsing [c2] cfg' sp' ep pass true) in 
+                              let cfg'' = (parsing [c2] cfg' sp' ep' pass true) in 
                               let cfg''' = Cfg.add_edge sp' npass cfg'' in
                               let cfg'''' = (parsing tl cfg''' lp ep' npass loop) in 
-                              Cfg.add_edge ep' ep cfg'''' (* connect 10 to 5 *) 
+                              if loop then cfg'''' else Cfg.add_edge ep' ep cfg'''' (* connect 10 to 5 *) 
   end
   | _ -> let cfg' = Cfg.add_edge pr ep cfg in if loop then Cfg.add_edge ep lp cfg' else cfg'
 (****)
@@ -792,8 +792,24 @@ let pgm4 =
     Assign ("x", Plus (Var "x", Const 1)); 
   ]
 
-let cfg = cmd2cfg pgm3
-(* let _ = Cfg.print cfg *)
-(* let _ = Cfg.dot cfg *)
-let table = analyze cfg 
-let _ = Table.print table
+(* double while loop *)
+let pgm5 = 
+  Seq [
+    Assign ("x", Const 0); 
+    Assign ("y", Const 0);
+    While (Le (Var "x", Const 9), 
+     
+        While (Le (Var "y", Const 9), 
+          Seq [
+            Assign ("x", Plus (Var "x", Const 1)); 
+            Assign ("y", Plus (Var "y", Const 1)); 
+          ]););
+    ]
+  
+
+
+let cfg = cmd2cfg pgm5
+let _ = Cfg.print cfg
+let _ = Cfg.dot cfg
+(* let table = analyze cfg  *)
+(* let _ = Table.print table *)
