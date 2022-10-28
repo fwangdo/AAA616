@@ -806,9 +806,19 @@ let pgm5 =
           ]););
     ]
   
+let pgm6 = 
+  Seq [
+    Assign ("x", Const 0); 
+    Assign ("y", Const 0);
+    While (And (Le (Var "x", Const 9), Le (Var "y", Const 9)), 
+      Seq [
+        Assign ("x", Plus (Var "x", Const 1)); 
+        Assign ("y", Plus (Var "y", Const 1)); 
+      ]);
+  ]
 
 
-let cfg = cmd2cfg pgm5
+let cfg = cmd2cfg pgm6
 let _ = Cfg.print cfg
 let _ = Cfg.dot cfg
 (* let table = analyze cfg  *)
