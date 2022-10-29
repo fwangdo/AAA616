@@ -576,7 +576,6 @@ module AbsMem : AbsMem = struct
 
 end
 
-
 module type Table = sig
   type t = AbsMem.t NodeMap.t
   val empty : t
@@ -599,10 +598,36 @@ module Table : Table = struct
     prerr_endline "") t  
 end
 
+(* To consider relation between variables. *)
+let rec update_mem : bexp -> Table.t -> Table.t 
+= fun bexp tab -> match bexp with 
+  | Equal (a1, a2) -> let left = find_var a1 in let right = find_var a2 in  
+  | Le    (a1, a2) ->
+  | _ -> tab
+and transposition : aexp -> bool -> (aexp * aexp) -> (aexp * aexp) (* example of output, x = 2y + z. *)
+= fun var pos exp -> let (left, right) -> exp in (* if pos is true, then position of var is left. otherwise, vars is located in right of exp. *)
+  if pos then  
+  else 
+and trans_aux : aexp -> aexp -> (aexp * aexp)
+= fun left right -> match left with
+  | Plus (a1, a2) -> (find_var a1 lst) @ (find_var a2 lst)
+  | Mult (a1, a2) -> (find_var a1 lst) @ (find_var a2 lst)
+  | Sub  (a1, a2) -> (find_var a1 lst) @ (find_var a2 lst) 
+  | _ -> (left, right)
+and find_var : aexp -> aexp list -> aexp list (* will give you the vars with position(e.g. left, right.)*) 
+= fun aexp lst -> match aexp with 
+  | Const i       -> lst 
+  | Var   s       -> s::lst 
+  | Plus (a1, a2) -> (find_var a1 lst) @ (find_var a2 lst)
+  | Mult (a1, a2) -> (find_var a1 lst) @ (find_var a2 lst)
+  | Sub  (a1, a2) -> (find_var a1 lst) @ (find_var a2 lst)
+and calc_div : 
+
 (* let fold_update : (f * (aexp * Interval.t)) -> AbsMem.t -> AbsMem.t
 = fun (var, iv) mem -> let before = AbsMem.find var mem in 
   VarMap.update var (f before iv) mem *)
 
+(* I could have used 'meet' but I wrote additional function. *)
 let handle_le : Interval.t -> int -> bool -> Interval.t
 = fun iv i ord -> 
   let ii = Interval.Con i in 
