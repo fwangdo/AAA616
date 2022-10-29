@@ -810,7 +810,6 @@ let pgm5 =
     Assign ("x", Const 0); 
     Assign ("y", Const 0);
     While (Le (Var "x", Const 9), 
-     
         While (Le (Var "y", Const 9), 
           Seq [
             Assign ("x", Plus (Var "x", Const 1)); 
@@ -829,9 +828,35 @@ let pgm6 =
       ]);
   ]
 
+(* this is the last case that i should handle. *)
+let pgm7 = 
+  Seq [
+    Assign ("x", Const 1);
+    Assign ("y", Const 2);
+    Assign ("z", Const 3);
+    If ((Equal ((Plus ((Var "z"), (Mult(Var "x", Const 2)))), (Plus(Var "y", Var "z")))),
+      Seq [
+        Assign ("x", Plus (Var "x", Const 1)); 
+      ],
+      Seq []);
+    Assign ("y", Plus (Var "y", Const 11)); 
+  ]
 
-let cfg = cmd2cfg pgm3
-(* let _ = Cfg.print cfg *)
-(* let _ = Cfg.dot cfg *)
-let table = analyze cfg 
-let _ = Table.print table
+let pgm8 = 
+  Seq [
+    Assign ("x", Const 1);
+    Assign ("y", Const 2);
+    Assign ("z", Const 3);
+    If ((Le ((Plus ((Var "z"), (Mult(Var "x", Const 2)))), (Plus(Var "y", Var "z")))),
+      Seq [
+        Assign ("x", Plus (Var "x", Const 1)); 
+      ],
+      Seq []);
+    Assign ("y", Plus (Var "y", Const 11)); 
+  ]
+
+let cfg = cmd2cfg pgm8
+let _ = Cfg.print cfg
+let _ = Cfg.dot cfg
+(* let table = analyze cfg  *)
+(* let _ = Table.print table *)
