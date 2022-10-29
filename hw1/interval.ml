@@ -643,7 +643,19 @@ and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
                       | Const n, Var s -> execute_bexp (Equal(a2, a1)) mem not 
                       | Var s, Const n ->
                         if not 
-                        then VarMap.update s (update_option Interval.Top) mem  
+                        then let temp = AbsMem.find s mem in 
+                             let output = (match temp with 
+                              | Iv (Con a, Con b) -> if (a = n) && (b = n) then Interval.Bot else(
+                                                      if a = b then temp 
+                                                      else if a = n then Iv (Interval.Con (a+1), Interval.Con b)
+                                                      else if b = n then Iv (Interval.Con a, Interval.Con (b-1))  
+                                                      else temp)
+                              | Iv (N_inf, Con b) -> if b = n then Iv (N_inf, Con (b-1)) else temp
+                              | Iv (Con a, P_inf) -> if a = n then Iv (Con (a+1), P_inf) else temp
+                              | Iv (N_inf, P_inf) -> temp
+                              | Bot -> Bot
+                              | Top -> Top
+                              | _ -> raise (Failure "Impossible case in not equal case.")) in VarMap.update s (update_option output) mem  
                         else VarMap.update s (update_option (Interval.alpha n)) mem
                       | _, _ -> raise (Failure "undefined"))  
   | Le    (a1, a2) -> (match a1, a2 with
@@ -818,8 +830,8 @@ let pgm6 =
   ]
 
 
-let cfg = cmd2cfg pgm6
-let _ = Cfg.print cfg
-let _ = Cfg.dot cfg
-(* let table = analyze cfg  *)
-(* let _ = Table.print table *)
+let cfg = cmd2cfg pgm3
+(* let _ = Cfg.print cfg *)
+(* let _ = Cfg.dot cfg *)
+let table = analyze cfg 
+let _ = Table.print table
