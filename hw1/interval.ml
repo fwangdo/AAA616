@@ -670,11 +670,12 @@ and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
   | And   (b1, b2) -> if not then let mem' = execute_bexp b1 mem not in let mem'' = execute_bexp b2 mem not in AbsMem.join mem' mem''  
                       else let mem' = execute_bexp b1 mem not in execute_bexp b2 mem' not 
 (* To consider relation between variables. *)
+(* all bug, need to fix code to consider order and le cases.*)
 and update_mem : bexp -> AbsMem.t -> AbsMem.t 
-= fun bexp mem -> let composition aexp mem =  
+= fun bexp mem -> (*let composition aexp mem = *)  
   match bexp with 
-  | Equal (a1, a2) -> let left = find_var a1 in let right = find_var a2 in  
-  | Le    (a1, a2) ->
+  | Equal (a1, a2) -> let left = find_var a1 in let right = find_var a2 in raise (Failure "d")
+  | Le    (a1, a2) -> raise (Failure "d")
   | _ -> mem 
 and inter_execute : (aexp * aexp) -> AbsMem.t -> AbsMem.t
 = fun (left, right) mem -> let va = execute_aexp right mem in match left, right with (* left is the one should be updated. *) 
@@ -683,23 +684,23 @@ and inter_execute : (aexp * aexp) -> AbsMem.t -> AbsMem.t
   | Mult (Const z, Var s), _ -> let divided = div_aux va z in VarMap.update s (update_option divided) mem 
 and trans_aux : aexp -> aexp -> aexp -> bool -> (aexp * aexp) (* example of output, x = 2y + z. *)
 = fun var left right isLeft -> let Var(name) = var in (* if isLeft is true, then position of var is left. otherwise, vars is located in right of exp. *)
-  if isLeft 
+  (if isLeft 
   then (match left with
-  | Mult (Var s, Const mul) = if name = s then (left, right) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
-  | Mult (Const mul, Val s) = if name = s then (left, right) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
-  | Var s = if name = s then (s, right, true) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
+  | Mult (Var s, Const mul) -> if name = s then (left, right) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
+  | Mult (Const mul, Var s) -> if name = s then (left, right) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
+  | Var s                   -> if name = s then (s, right) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
   | Plus (a1, a2) -> if find_aux a1 then let new_right = Sub (right, a2) in trans_aux var a1 new_right isLeft else let new_right = Sub (right, a1) in trans_aux var a2 new_right isLeft 
   | Sub  (a1, a2) -> if find_aux a1 then let new_right = Plus (right, a2) in trans_aux var a1 new_right isLeft else let new_right = Sub (right, a1) in trans_aux var (Mult (new_right, Const (-1))) (Mult (a2, Const (-1))) false (* important *) 
   | Mult (a1, a2) -> if find_aux a1 then trans_aux var (mult_aux a1 a2) right isLeft else trans_aux var (mult_aux a2 a1) right isLeft
   | _ -> raise (Failure "Error in trans_aux: Const found")) 
   else (match right with (* result : left is the one would be updated, right is just material *)
-  | Mult (Var s, Const mul) = if name = s then (right, left) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
-  | Mult (Const mul, Val s) = if name = s then (right, left) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
-  | Var s = if name = s then (left, s, false) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
+  | Mult (Var s, Const mul) -> if name = s then (right, left) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
+  | Mult (Const mul, Val s) -> if name = s then (right, left) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
+  | Var s                   -> if name = s then (s, left, false) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
   | Plus (a1, a2) -> if find_aux a1 then let new_left = Sub (left, a2) in trans_aux var a1 new_left isLeft else let new_left = Sub (left, a1) in trans_aux var a2 new_left isLeft 
   | Sub  (a1, a2) -> if find_aux a1 then let new_left = Plus (left, a2) in trans_aux var a1 new_left isLeft else let new_left = Sub (left, a1) in trans_aux var (Mult (a2, Const (-1))) (Mult (new_left, Const (-1))) true (* important *) 
   | Mult (a1, a2) -> if find_aux a1 then trans_aux var left (mult_aux a1 a2) isLeft else trans_aux var left (mult_aux a2 a1) isLeft
-  | _ -> raise (Failure "Error in trans_aux: Const found")) 
+  | _ -> raise (Failure "Error in trans_aux: Const found"))) 
 and mult_aux : aexp -> aexp -> aexp (* multipled -> multiplying -> result *)
 = fun obj sub -> match obj with 
   | Const i       -> Mult (obj, sub) 
@@ -726,11 +727,13 @@ and div_aux : Interval.t -> int -> Interval.t
   | Interval.Bot -> Interval.Bot 
   | Interval.Top -> Interval.Top
   | Interval.Iv(a, b) -> 
-    begin match a, b with
-    | N_inf, P_inf -> iv
-    | N_inf, Const b' -> Interval.Iv(a, Const (b' / div)) 
-    | Const a', P_inf -> Interval.Iv(Const (a' / div), b) 
-    | Const a', Const b' -> let new_a = (a' / div) in let new_b = (b' / div) let divided = Interval.Iv(Const new_a, Const new_b) in if ((new_a = new_b) && ((new_a mod div) <> 0)) then Iv.Bot else diveded (* check whether diveded has at least one multiple of'div'. if not so, it's bottom. *) 
+    (match a, b with
+    | N_inf, P_inf       -> iv
+    | N_inf, Const b'    -> Interval.Iv(a, Const (b' / div)) 
+    | Const a', P_inf    -> Interval.Iv(Const (a' / div), b) 
+    | Const a', Const b' -> let new_a = (a' / div) in let new_b = (b' / div) in let divided = Interval.Iv(Const new_a, Const new_b) in 
+                            (if ((new_a = new_b) && ((new_a mod div) <> 0)) then Iv.Bot else diveded)) 
+(* check whether diveded has at least one multiple of'div'. if not so, it's bottom. *) 
 
 (* consider relations between variables in eq, le. *)
 (* and aux_bexp : aexp -> aexp -> (aexp * Interval.t) list  
@@ -746,6 +749,7 @@ and div_aux : Interval.t -> int -> Interval.t
 
 (* for all variable to have interal with considering relations. *)
 (* and transposition : aexp -> aexp -> (aexp * aexp) *)
+
 let rec first_fhat : Node.t list -> Cfg.t -> Table.t -> Table.t
 = fun lst cfg tab -> match lst with 
   | hd::tl -> let n, ins = hd in 
