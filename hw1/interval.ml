@@ -641,22 +641,21 @@ and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
   | Equal (a1, a2) -> (match a1, a2 with
                       | Const n1, Const n2 -> mem (* bottom? or normal execution? *)
                       | Const n, Var s -> execute_bexp (Equal(a2, a1)) mem not 
-                      | Var s, Const n ->
+                      | Var s, Const n -> let temp = AbsMem.find s mem in
                         if not 
-                        then let temp = AbsMem.find s mem in 
-                             let output = (match temp with 
-                              | Iv (Con a, Con b) -> if (a = n) && (b = n) then Interval.Bot else(
-                                                      if a = b then temp 
-                                                      else if a = n then Iv (Interval.Con (a+1), Interval.Con b)
-                                                      else if b = n then Iv (Interval.Con a, Interval.Con (b-1))  
-                                                      else temp)
-                              | Iv (N_inf, Con b) -> if b = n then Iv (N_inf, Con (b-1)) else temp
-                              | Iv (Con a, P_inf) -> if a = n then Iv (Con (a+1), P_inf) else temp
-                              | Iv (N_inf, P_inf) -> temp
-                              | Bot -> Bot
-                              | Top -> Top
-                              | _ -> raise (Failure "Impossible case in not equal case.")) in VarMap.update s (update_option output) mem  
-                        else VarMap.update s (update_option (Interval.alpha n)) mem
+                        then  let output = (match temp with 
+                                | Iv (Con a, Con b) -> if (a = n) && (b = n) then Interval.Bot else(
+                                                        if a = b then temp 
+                                                        else if a = n then Iv (Interval.Con (a+1), Interval.Con b)
+                                                        else if b = n then Iv (Interval.Con a, Interval.Con (b-1))  
+                                                        else temp)
+                                | Iv (N_inf, Con b) -> if b = n then Iv (N_inf, Con (b-1)) else temp
+                                | Iv (Con a, P_inf) -> if a = n then Iv (Con (a+1), P_inf) else temp
+                                | Iv (N_inf, P_inf) -> temp
+                                | Bot -> Bot
+                                | Top -> Top
+                                | _ -> raise (Failure "Impossible case in not equal case.")) in VarMap.update s (update_option output) mem  
+                        else let new_val = Interval.meet temp (Interval.alpha n) in VarMap.update s (update_option new_val) mem 
                       | _, _ -> raise (Failure "undefined"))  
   | Le    (a1, a2) -> (match a1, a2 with
                       | Const n1, Const n2 -> mem (* bottom? or normal execution? *)
@@ -828,7 +827,7 @@ let pgm6 =
       ]);
   ]
 
-(* this is the last case that i should handle. *)
+(* these two pgms are the last cases that I should handle. *)
 let pgm7 = 
   Seq [
     Assign ("x", Const 1);
@@ -847,7 +846,7 @@ let pgm8 =
     Assign ("x", Const 1);
     Assign ("y", Const 2);
     Assign ("z", Const 3);
-    If ((Le ((Plus ((Var "z"), (Mult(Var "x", Const 2)))), (Plus(Var "y", Var "z")))),
+    If ((Le ((Plus ((Var "z"), (Mult(Var "x", Const 3)))), (Plus(Var "y", Var "z")))),
       Seq [
         Assign ("x", Plus (Var "x", Const 1)); 
       ],
@@ -855,8 +854,8 @@ let pgm8 =
     Assign ("y", Plus (Var "y", Const 11)); 
   ]
 
-let cfg = cmd2cfg pgm8
-let _ = Cfg.print cfg
-let _ = Cfg.dot cfg
-(* let table = analyze cfg  *)
-(* let _ = Table.print table *)
+let cfg = cmd2cfg pgm
+(* let _ = Cfg.print cfg *)
+(* let _ = Cfg.dot cfg *)
+let table = analyze cfg 
+let _ = Table.print table
