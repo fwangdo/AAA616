@@ -658,7 +658,7 @@ and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
   | True           -> if not then AbsMem.empty else mem 
   | False          -> if not then mem else AbsMem.empty
   | Equal (a1, a2) -> (match a1, a2 with
-                      | Const n1, Const n2 -> mem (* bottom? or normal execution? *)
+                      | Const n1, Const n2 -> if not then (if n1 = n2 then AbsMem.empty else mem) else (if n1 = n2 then mem else AbsMem.empty)
                       | Const n, Var s -> execute_bexp (Equal(a2, a1)) mem not 
                       | Var s, Const n -> let temp = AbsMem.find s mem in
                         if not 
@@ -675,6 +675,9 @@ and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
                                 | Top -> Top
                                 | _ -> raise (Failure "Impossible case in not equal case.")) in VarMap.update s (update_option output) mem  
                         else let new_val = Interval.meet temp (Interval.alpha n) in VarMap.update s (update_option new_val) mem 
+                      | Var s1, Var s2 -> let s1' = VarMap.find s1 mem in let s2' = VarMap.find s2 mem in 
+                                          if not then mem 
+                                          else (let new_val = Interval.meet s1' s2' in let mem' = VarMap.update s1 (update_option new_val) mem in VarMap.update s2 (update_option new_val) mem')
                       | _, _ -> update_mem exp mem)  
   | Le    (a1, a2) -> (match a1, a2 with
                       | Const n1, Const n2 -> mem (* bottom? or normal execution? *)
@@ -1006,15 +1009,15 @@ let pgm10 =
   Seq [
     Assign ("x", Const 1);
     Assign ("y", Const 6);
-    If (And (Not False, (And (True, (Equal (Var "x", Var "y"))))),
+    If (And ((Not False), (And (True, (Equal (Var "x", Var "y"))))),
       Seq [
         Assign ("x", Plus (Var "x", Const 1)); 
       ],
       Seq []);
     Assign ("y", Plus (Var "y", Const 11)); 
   ]
-let cfg = cmd2cfg pgm10
-let _ = Cfg.print cfg
-let _ = Cfg.dot cfg
+let cfg = cmd2cfg pgm
+(* let _ = Cfg.print cfg
+let _ = Cfg.dot cfg *)
 let table = analyze cfg 
 let _ = Table.print table
