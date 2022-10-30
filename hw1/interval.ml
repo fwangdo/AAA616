@@ -178,6 +178,15 @@ end
 let take_pgm : cmd -> cmd list 
 = function | Seq(lst) -> lst | _ -> (raise (Failure "Impossible case"))
 
+(* let seperate_bool : bool -> bexp -> Node.t -> Node.t -> Cfg.t -> Cfg.t
+= fun not bexp sp cfg -> match bexp with 
+  | True -> if not then     
+  | False -> cfg
+  | Equal (a1, a2)
+  | Le (a1, a2)
+  | Not b1 
+  | And (b1, b2)  *)
+
 let rec cmd2cfg : cmd -> Cfg.t 
 = fun cmd -> let init = Cfg.empty in 
   let lst = take_pgm cmd in 
@@ -636,8 +645,8 @@ and execute_aexp : aexp -> AbsMem.t -> Interval.t
 (* this one will return memory itself.*)
 and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
 = fun exp mem not -> match exp with (* n_not means the number of not *) 
-  | True           -> mem 
-  | False          -> mem 
+  | True           -> if not then AbsMem.empty else mem 
+  | False          -> if not then mem else AbsMem.empty
   | Equal (a1, a2) -> (match a1, a2 with
                       | Const n1, Const n2 -> mem (* bottom? or normal execution? *)
                       | Const n, Var s -> execute_bexp (Equal(a2, a1)) mem not 
@@ -684,8 +693,15 @@ and update_mem : bexp -> AbsMem.t -> AbsMem.t
   | _ -> mem
 and update_aux : (aexp * Interval.t * bool) -> isEqual:bool -> mem:AbsMem.t -> (string * Interval.t) 
 = fun (var, iv, isLeft) ~isEqual ~mem -> let name = (function | Var s -> s | _ -> raise (Failure "Error in name")) var in 
-  if isEqual then (name, iv) else
-    (let temp = le_aux name iv isLeft mem in (name, temp))   
+  if isEqual then (let temp = eq_aux name iv mem in (name, temp)) 
+  else (let temp = le_aux name iv isLeft mem in (name, temp))   
+and eq_aux : string -> Interval.t -> AbsMem.t -> Interval.t
+= fun name iv mem -> let s_value = AbsMem.find name mem in match s_value, iv with 
+  | Bot, _ -> Bot 
+  | _, Bot -> Bot 
+  | Top, b -> b 
+  | _, Top -> Top
+  | a, b   -> Interval.meet a b 
 (* need unit test. *)
 and le_aux : string -> Interval.t -> bool -> AbsMem.t -> Interval.t 
 = fun name iv isLeft mem -> let s_value = AbsMem.find name mem in 
@@ -976,8 +992,19 @@ let pgm9 =
     Assign ("y", Plus (Var "y", Const 11)); 
   ]
 
-let cfg = cmd2cfg pgm7
-(* let _ = Cfg.print cfg
-let _ = Cfg.dot cfg *)
+let pgm10 = 
+  Seq [
+    Assign ("x", Const 1);
+    Assign ("y", Const 6);
+    If (And (Not False, (And (True, (Equal (Var "x", Var "y"))))),
+      Seq [
+        Assign ("x", Plus (Var "x", Const 1)); 
+      ],
+      Seq []);
+    Assign ("y", Plus (Var "y", Const 11)); 
+  ]
+let cfg = cmd2cfg pgm10
+let _ = Cfg.print cfg
+let _ = Cfg.dot cfg
 let table = analyze cfg 
 let _ = Table.print table
