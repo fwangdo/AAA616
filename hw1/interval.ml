@@ -178,14 +178,14 @@ end
 let take_pgm : cmd -> cmd list 
 = function | Seq(lst) -> lst | _ -> (raise (Failure "Impossible case"))
 
-(* let seperate_bool : bool -> bexp -> Node.t -> Node.t -> Cfg.t -> Cfg.t
-= fun not bexp sp cfg -> match bexp with 
-  | True -> if not then     
-  | False -> cfg
-  | Equal (a1, a2)
-  | Le (a1, a2)
-  | Not b1 
-  | And (b1, b2)  *)
+let rec seperate_bool : bexp -> Node.t -> Node.t list -> Cfg.t -> (Node.t * Node.t list * Cfg.t)
+= fun bexp sp lst cfg -> match bexp with 
+  | True -> let suss = (Node.create_assume bexp) in (suss, lst, (Cfg.add_edge sp suss cfg))  
+  | False -> let fail = (Node.create_assume bexp) in (fail, lst, (Cfg.add_edge sp fail cfg)) 
+  | Equal (a1, a2) -> let suss = Node.create_assume bexp in let fail = Node.create_assume (Not bexp) in (suss ,fail::lst, (Cfg.add_edge sp suss cfg))
+  | Le (a1, a2) -> let suss = Node.create_assume bexp in let fail = Node.create_assume (Not bexp) in (suss, fail::lst, (Cfg.add_edge sp suss cfg))
+  | Not b1 -> let suss = Node.create_assume bexp in let fail = Node.create_assume (Not bexp) in (suss, fail::lst, (Cfg.add_edge sp suss cfg))
+  | And (b1, b2) -> let (suss, lst1, cfg1) = seperate_bool b1 sp lst cfg in let (suss', lst2, cfg2) = seperate_bool b2 suss lst1 cfg1 in (suss', lst2, cfg2) 
 
 let rec cmd2cfg : cmd -> Cfg.t 
 = fun cmd -> let init = Cfg.empty in 
@@ -495,6 +495,7 @@ module type AbsMem = sig
   val add : string -> Interval.t -> t -> t
   val find : string -> t -> Interval.t 
   val join : t -> t -> t 
+  val meet : t -> t -> t 
   val widen : t -> t -> t 
   val narrow : t -> t -> t
   val order : t -> t -> bool 
@@ -554,7 +555,16 @@ module AbsMem : AbsMem = struct
     let m2_keys = keys m2' in  
     let keys = union_keys m1_keys m2_keys in 
     let m3 = empty in calc (Interval.join) m1 m2 keys m3 
-   
+    
+   let meet : t -> t -> t 
+   = fun m1 m2 -> 
+    let m1' = VarMap.bindings m1 in 
+    let m2' = VarMap.bindings m2 in 
+    let m1_keys = keys m1' in
+    let m2_keys = keys m2' in  
+    let keys = union_keys m1_keys m2_keys in 
+    let m3 = empty in calc (Interval.meet) m1 m2 keys m3  
+
   let widen m1 m2 = 
     (* let _  = print_endline __FUNCTION__ in  *)
     let m1' = VarMap.bindings m1 in 
@@ -677,7 +687,7 @@ and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
                       | _, _ -> update_mem exp mem)
   | Not   b        -> execute_bexp b mem (if not then false else true) (* then -> double negation. *)  
   | And   (b1, b2) -> if not then let mem' = execute_bexp b1 mem not in let mem'' = execute_bexp b2 mem not in AbsMem.join mem' mem''  
-                      else let mem' = execute_bexp b1 mem not in execute_bexp b2 mem' not 
+                      else let temp1 = execute_bexp b1 mem not in let temp2 = execute_bexp b2 mem not in (AbsMem.meet temp1 temp2)
 (* To consider relation between variables. *)
 (* need to fix code to consider order and le cases.*)
 and update_mem : bexp -> AbsMem.t -> AbsMem.t 
