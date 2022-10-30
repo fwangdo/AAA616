@@ -656,7 +656,7 @@ and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
                                 | Top -> Top
                                 | _ -> raise (Failure "Impossible case in not equal case.")) in VarMap.update s (update_option output) mem  
                         else let new_val = Interval.meet temp (Interval.alpha n) in VarMap.update s (update_option new_val) mem 
-                      | _, _ -> raise (Failure "undefined"))  
+                      | _, _ -> update_mem exp mem)  
   | Le    (a1, a2) -> (match a1, a2 with
                       | Const n1, Const n2 -> mem (* bottom? or normal execution? *)
                       | Const n, Var s -> 
@@ -665,7 +665,7 @@ and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
                       | Var s, Const n ->
                         if not then execute_bexp (Le(Const(n+1), Var s)) mem false  
                                else let new_iv = (handle_le (AbsMem.find s mem) n true) in VarMap.update s (update_option new_iv) mem
-                      | _, _ -> raise (Failure "undefined")) 
+                      | _, _ -> update_mem exp mem)
   | Not   b        -> execute_bexp b mem (if not then false else true) (* then -> double negation. *)  
   | And   (b1, b2) -> if not then let mem' = execute_bexp b1 mem not in let mem'' = execute_bexp b2 mem not in AbsMem.join mem' mem''  
                       else let mem' = execute_bexp b1 mem not in execute_bexp b2 mem' not 
@@ -674,10 +674,13 @@ and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
 and update_mem : bexp -> AbsMem.t -> AbsMem.t 
 = fun bexp mem -> 
   match bexp with 
-  | Equal (a1, a2) -> let left = find_var a1 [] in let right = find_var a2 [] in 
-                      let rcd = composition left a1 a2 true true mem mem in composition right a1 a2 false true mem rcd   
+  (* need to handle a case where there is no var. *)
+  | Equal (a1, a2) -> let left = find_var a1 [] in let right = find_var a2 [] in  
+                      if ((left@right) |> List.length) = 0 then mem else
+                      (let rcd = composition left a1 a2 true true mem mem in composition right a1 a2 false true mem rcd)   
   | Le    (a1, a2) -> let left = find_var a1 [] in let right = find_var a2 [] in 
-                      let rcd = composition left a1 a2 true false mem mem in composition right a1 a2 false false mem rcd
+                      if ((left@right) |> List.length) = 0 then mem else
+                      (let rcd = composition left a1 a2 true false mem mem in composition right a1 a2 false false mem rcd)
   | _ -> mem
 and update_aux : (aexp * Interval.t * bool) -> isEqual:bool -> mem:AbsMem.t -> (string * Interval.t) 
 = fun (var, iv, isLeft) ~isEqual ~mem -> let name = (function | Var s -> s | _ -> raise (Failure "Error in name")) var in 
@@ -720,6 +723,7 @@ and inter_execute : (aexp * aexp * bool) -> mem:AbsMem.t -> (aexp * Interval.t *
   | _ -> raise (Failure "Error in inter execute: Impossible case.")
 and trans_aux : aexp -> aexp -> aexp -> bool -> (aexp * aexp * bool) (* example of output, 2(x + z) = 4y + 8z => x = 2y + 6z. *)
 = fun var left right isLeft -> let name = (function | Var s -> s | _ -> raise (Failure "Error in name")) var in (* if isLeft is true, then position of var is left. otherwise, vars is located in right of exp. *)
+  print_endline ("Var: " ^ name ^ "," ^ "Left: " ^ (string_of_aexp left) ^ "," ^ "Right: " ^ (string_of_aexp right));
   (if isLeft 
   then (match left with
   | Mult (Var s, Const mul) -> if name = s then (left, right, true) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
@@ -733,8 +737,8 @@ and trans_aux : aexp -> aexp -> aexp -> bool -> (aexp * aexp * bool) (* example 
   | Mult (Var s, Const mul) -> if name = s then (right, left, false) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
   | Mult (Const mul, Var s) -> if name = s then (right, left, false) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
   | Var s                   -> if name = s then (right, left, false) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
-  | Plus (a1, a2) -> if find_aux var a1 then let new_left = Sub (left, a2) in trans_aux var a1 new_left isLeft else let new_left = Sub (left, a1) in trans_aux var a2 new_left isLeft 
-  | Sub  (a1, a2) -> if find_aux var a1 then let new_left = Plus (left, a2) in trans_aux var a1 new_left isLeft else let new_left = Sub (left, a1) in trans_aux var (Mult (a2, Const (-1))) (Mult (new_left, Const (-1))) true (* important *) 
+  | Plus (a1, a2) -> if find_aux var a1 then let new_left = Sub (left, a2) in trans_aux var new_left a1 isLeft else let new_left = Sub (left, a1) in trans_aux var new_left a2 isLeft 
+  | Sub  (a1, a2) -> if find_aux var a1 then let new_left = Plus (left, a2) in trans_aux var new_left a1 isLeft else let new_left = Sub (left, a1) in trans_aux var (Mult (a2, Const (-1))) (Mult (new_left, Const (-1))) true (* important *) 
   | Mult (a1, a2) -> if find_aux var a1 then trans_aux var left (mult_aux a1 a2) isLeft else trans_aux var left (mult_aux a2 a1) isLeft
   | _ -> raise (Failure "Error in trans_aux: Const found"))) 
 and mult_aux : aexp -> aexp -> aexp (* multipled -> multiplying -> result *)
@@ -958,7 +962,7 @@ let pgm8 =
     Assign ("y", Plus (Var "y", Const 11)); 
   ]
 
-let cfg = cmd2cfg pgm
+let cfg = cmd2cfg pgm8
 (* let _ = Cfg.print cfg *)
 (* let _ = Cfg.dot cfg *)
 let table = analyze cfg 
