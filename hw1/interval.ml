@@ -715,6 +715,7 @@ and composition : aexp list -> aexp -> aexp -> bool -> bool -> AbsMem.t -> AbsMe
   | hd::tl -> let (name, iv) = (trans_aux hd left right isLeft) |> (inter_execute ~mem:mem) |> (update_aux ~isEqual:isEqual ~mem:mem) in 
               let rcd' = VarMap.update name (update_option iv) rcd in composition tl left right isLeft isEqual mem rcd'
   | _      -> rcd 
+(*right should be calculated more. then, need to applied to execute_aexp. *)
 and inter_execute : (aexp * aexp * bool) -> mem:AbsMem.t -> (aexp * Interval.t * bool)
 = fun (left, right, isLeft) ~mem -> let va = execute_aexp right mem in match left, right with (* left is the one should be updated. *) 
   | Var s, _ -> (Var s, va, isLeft)  
@@ -723,7 +724,7 @@ and inter_execute : (aexp * aexp * bool) -> mem:AbsMem.t -> (aexp * Interval.t *
   | _ -> raise (Failure "Error in inter execute: Impossible case.")
 and trans_aux : aexp -> aexp -> aexp -> bool -> (aexp * aexp * bool) (* example of output, 2(x + z) = 4y + 8z => x = 2y + 6z. *)
 = fun var left right isLeft -> let name = (function | Var s -> s | _ -> raise (Failure "Error in name")) var in (* if isLeft is true, then position of var is left. otherwise, vars is located in right of exp. *)
-  print_endline ("Var: " ^ name ^ "," ^ "Left: " ^ (string_of_aexp left) ^ "," ^ "Right: " ^ (string_of_aexp right));
+  (* print_endline ("Var: " ^ name ^ "," ^ "Left: " ^ (string_of_aexp left) ^ "," ^ "Right: " ^ (string_of_aexp right)); *)
   (if isLeft 
   then (match left with
   | Mult (Var s, Const mul) -> if name = s then (left, right, true) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
@@ -772,7 +773,7 @@ and div_aux : Interval.t -> int -> Interval.t
     | N_inf, Con b'    -> Interval.Iv(a, Con (b' / div)) 
     | Con a', P_inf    -> Interval.Iv(Con (a' / div), b) 
     | Con a', Con b' -> let new_a = (a' / div) in let new_b = (b' / div) in let divided = Interval.Iv(Con new_a, Con new_b) in 
-                            (if ((new_a = new_b) && ((new_a mod div) <> 0)) then Interval.Bot else divided) 
+                           (if ((new_a = new_b) && ((a' mod div) <> 0)) then Interval.Bot else divided) 
     | _ -> raise (Failure "Error in div_aux : Impossible cases "))
 (* check whether divided has at least one multiple of'div'. if not so, it's bottom. *) 
 
@@ -940,8 +941,8 @@ let pgm7 =
   Seq [
     Assign ("x", Const 1);
     Assign ("y", Const 2);
-    Assign ("z", Const 3);
-    If ((Equal ((Plus ((Var "z"), (Mult(Var "x", Const 2)))), (Plus(Var "y", Var "z")))),
+    Assign ("z", Const 4);
+    If ((Equal ((Mult(Var "x", Const 6)), (Plus(Var "y", Var "z")))),
       Seq [
         Assign ("x", Plus (Var "x", Const 1)); 
       ],
@@ -954,7 +955,7 @@ let pgm8 =
     Assign ("x", Const 1);
     Assign ("y", Const 2);
     Assign ("z", Const 3);
-    If ((Le ((Plus ((Var "z"), (Mult(Var "x", Const 3)))), (Plus(Var "y", Var "z")))),
+    If ((Le (Mult(Var "x", Const 3), (Plus(Var "y", Var "z")))),
       Seq [
         Assign ("x", Plus (Var "x", Const 1)); 
       ],
@@ -962,8 +963,21 @@ let pgm8 =
     Assign ("y", Plus (Var "y", Const 11)); 
   ]
 
-let cfg = cmd2cfg pgm8
-(* let _ = Cfg.print cfg *)
-(* let _ = Cfg.dot cfg *)
+let pgm9 = 
+  Seq [
+    Assign ("x", Const 1);
+    Assign ("y", Const 6);
+    Assign ("z", Const 3);
+    If ((Le (Mult(Var "x", Const 3), (Plus(Var "y", Var "z")))),
+      Seq [
+        Assign ("x", Plus (Var "x", Const 1)); 
+      ],
+      Seq []);
+    Assign ("y", Plus (Var "y", Const 11)); 
+  ]
+
+let cfg = cmd2cfg pgm7
+(* let _ = Cfg.print cfg
+let _ = Cfg.dot cfg *)
 let table = analyze cfg 
 let _ = Table.print table
