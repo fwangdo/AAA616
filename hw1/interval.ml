@@ -672,18 +672,54 @@ and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
 (* To consider relation between variables. *)
 (* need to fix code to consider order and le cases.*)
 and update_mem : bexp -> AbsMem.t -> AbsMem.t 
-= fun bexp mem -> (*let composition aexp mem = *)  
+= fun bexp mem -> 
   match bexp with 
-  | Equal (a1, a2) -> let left = find_var a1 in let right = find_var a2 in raise (Failure "d")
-  | Le    (a1, a2) -> raise (Failure "d")
-  | _ -> mem 
-and inter_execute : (aexp * aexp) -> AbsMem.t -> AbsMem.t
-= fun (left, right) mem -> let va = execute_aexp right mem in match left, right with (* left is the one should be updated. *) 
-  | Var s, _ -> VarMap.update s (update_option va) mem 
-  | Mult (Var s, Const z), _ -> let divided = div_aux va z in VarMap.update s (update_option divided) mem 
-  | Mult (Const z, Var s), _ -> let divided = div_aux va z in VarMap.update s (update_option divided) mem 
-and trans_aux : aexp -> aexp -> aexp -> bool -> (aexp * aexp * bool) (* example of output, x = 2y + z. *)
-= fun var left right isLeft -> let Var(name) = var in (* if isLeft is true, then position of var is left. otherwise, vars is located in right of exp. *)
+  | Equal (a1, a2) -> let left = find_var a1 [] in let right = find_var a2 [] in 
+                      let rcd = composition left a1 a2 true true mem mem in composition right a1 a2 false true mem rcd   
+  | Le    (a1, a2) -> let left = find_var a1 [] in let right = find_var a2 [] in 
+                      let rcd = composition left a1 a2 true false mem mem in composition right a1 a2 false false mem rcd
+  | _ -> mem
+and update_aux : (aexp * Interval.t * bool) -> isEqual:bool -> mem:AbsMem.t -> (string * Interval.t) 
+= fun (var, iv, isLeft) ~isEqual ~mem -> let name = (function | Var s -> s | _ -> raise (Failure "Error in name")) var in 
+  if isEqual then (name, iv) else
+    (let temp = le_aux name iv isLeft mem in (name, temp))   
+(* need unit test. *)
+and le_aux : string -> Interval.t -> bool -> AbsMem.t -> Interval.t 
+= fun name iv isLeft mem -> let s_value = AbsMem.find name mem in 
+    if isLeft then 
+    (match (s_value, iv) with  
+    | Bot, _ -> Bot
+    | _, Bot -> Bot
+    | Top, Top -> Top 
+    | Top, Iv(a,b) -> Iv(N_inf, b) 
+    | Iv(a,b), Top -> s_value 
+    | Iv(a1,a2), Iv(b1,b2) -> if not(Interval.comp a1 b2) then Bot else (
+                              let new_a = a1 in  
+                              let new_b = if (Interval.comp a2 b2) then a2 else b2 in Iv(new_a, new_b)))
+    else 
+    (match (iv, s_value) with  
+    | Bot, _ -> Bot
+    | _, Bot -> Bot
+    | Top, Top -> Top 
+    | Top, Iv(a,b) -> Top 
+    | Iv(a,b), Top -> Iv(a, P_inf) 
+    | Iv(a1,a2), Iv(b1,b2) -> if not(Interval.comp a1 b2) then Bot else (
+                              let new_a = if (Interval.comp a1 b1) then b1 else a1 in 
+                              let new_b = b2 in Iv(new_a, new_b)))
+(* this func composes trans_aux with inter_execute *)
+and composition : aexp list -> aexp -> aexp -> bool -> bool -> AbsMem.t -> AbsMem.t -> AbsMem.t 
+= fun lst left right isLeft isEqual mem rcd -> match lst with (* rcd means record. *) 
+  | hd::tl -> let (name, iv) = (trans_aux hd left right isLeft) |> (inter_execute ~mem:mem) |> (update_aux ~isEqual:isEqual ~mem:mem) in 
+              let rcd' = VarMap.update name (update_option iv) rcd in composition tl left right isLeft isEqual mem rcd'
+  | _      -> rcd 
+and inter_execute : (aexp * aexp * bool) -> mem:AbsMem.t -> (aexp * Interval.t * bool)
+= fun (left, right, isLeft) ~mem -> let va = execute_aexp right mem in match left, right with (* left is the one should be updated. *) 
+  | Var s, _ -> (Var s, va, isLeft)  
+  | Mult (Var s, Const z), _ -> let divided = div_aux va z in (Var s, divided, isLeft)
+  | Mult (Const z, Var s), _ -> let divided = div_aux va z in (Var s, divided, isLeft)
+  | _ -> raise (Failure "Error in inter execute: Impossible case.")
+and trans_aux : aexp -> aexp -> aexp -> bool -> (aexp * aexp * bool) (* example of output, 2(x + z) = 4y + 8z => x = 2y + 6z. *)
+= fun var left right isLeft -> let name = (function | Var s -> s | _ -> raise (Failure "Error in name")) var in (* if isLeft is true, then position of var is left. otherwise, vars is located in right of exp. *)
   (if isLeft 
   then (match left with
   | Mult (Var s, Const mul) -> if name = s then (left, right, true) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
@@ -709,7 +745,7 @@ and mult_aux : aexp -> aexp -> aexp (* multipled -> multiplying -> result *)
   | Mult (a1, a2) -> Mult ((Mult (a1, sub)), (Mult (a2, sub))) 
   | Sub  (a1, a2) -> Sub ((Mult (a1, sub)), (Mult (a2, sub))) 
 and find_aux : aexp -> aexp -> bool 
-= fun var aexp -> let Var(name) = var in match aexp with 
+= fun var aexp -> let name = (function | Var s -> s | _ -> raise (Failure "Error in name")) var in match aexp with 
   | Const i       -> false 
   | Var   s       -> if name = s then true else false  
   | Plus (a1, a2) -> (find_aux var a1) || (find_aux var a2)
@@ -732,8 +768,9 @@ and div_aux : Interval.t -> int -> Interval.t
     | N_inf, Con b'    -> Interval.Iv(a, Con (b' / div)) 
     | Con a', P_inf    -> Interval.Iv(Con (a' / div), b) 
     | Con a', Con b' -> let new_a = (a' / div) in let new_b = (b' / div) in let divided = Interval.Iv(Con new_a, Con new_b) in 
-                            (if ((new_a = new_b) && ((new_a mod div) <> 0)) then Interval.Bot else divided)) 
-(* check whether diveded has at least one multiple of'div'. if not so, it's bottom. *) 
+                            (if ((new_a = new_b) && ((new_a mod div) <> 0)) then Interval.Bot else divided) 
+    | _ -> raise (Failure "Error in div_aux : Impossible cases "))
+(* check whether divided has at least one multiple of'div'. if not so, it's bottom. *) 
 
 (* consider relations between variables in eq, le. *)
 (* and aux_bexp : aexp -> aexp -> (aexp * Interval.t) list  
