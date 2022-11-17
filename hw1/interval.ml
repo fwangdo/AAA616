@@ -1016,8 +1016,8 @@ let pgm10 =
       Seq []);
     Assign ("y", Plus (Var "y", Const 11)); 
   ]
-let cfg = cmd2cfg pgm
-(* let _ = Cfg.print cfg
-let _ = Cfg.dot cfg *)
+let cfg = cmd2cfg pgm7
+let _ = Cfg.print cfg
+let _ = Cfg.dot cfg
 let table = analyze cfg 
 let _ = Table.print table
