@@ -1,0 +1,88 @@
+type exp = term * label
+and term =
+    | CONST of int
+    | VAR of string
+    | FN of string * exp
+    | RECFN of string * string * exp
+    | APP of exp * exp
+    | IF of exp * exp * exp
+    | LET of string * exp * exp
+    | BOP of op * exp * exp
+and label = int
+and op = PLUS | MINUS | MULT | DIV
+
+let string_of_exp (_,l) = string_of_int l
+let string_of_term term =
+    match term with
+    | CONST n -> string_of_int n
+    | VAR x -> x
+    | FN (x, e) -> "FN " ^ x ^ " -> " ^ string_of_exp e
+    | RECFN (f, x, e) -> "RecFN " ^ f ^ " " ^ x ^ " " ^ string_of_exp e
+    | APP (e1, e2) -> string_of_exp e1 ^ " " ^ string_of_exp e2
+    | IF (e1,e2,e3) -> "IF " ^ string_of_exp e1 ^ " " ^ string_of_exp e2 ^ " " ^ string_of_exp e3
+    | LET (x,e1,e2) -> "LET " ^ string_of_exp e1 ^ " " ^ string_of_exp e2
+    | BOP (_,e1,e2) -> "BOP " ^ string_of_exp e1 ^ " " ^ string_of_exp e2
+
+let ex1 = (APP (
+                    (FN ("x", (VAR "x", 1)) , 2),
+                    (FN("y", (VAR "y", 3)), 4)), 5)
+let ex2 = (LET ("g", (RECFN("f", "x", ((APP ((VAR "f", 1), ((FN ("y", (VAR "y", 2)), 3))), 4))), 5),(APP((VAR "g", 6), (FN("z", (VAR "z", 7)), 8)), 9)), 10)
+let ex3 = (LET ("f", (FN ("x", (VAR "x", 1)), 2),
+                            (APP (
+                                (APP (
+                                    (VAR "f", 3),
+                                    (VAR "f", 4)), 5),
+                                (FN ("y", (VAR "y", 6)), 7))
+                                    , 8)
+                                    )
+                                , 9)
+
+type eqn = SUBSET of data *     data | COND of data * data * data * data
+and data = T of term | C of label | V of string
+
+type constraints = eqn list
+
+module Term = struct
+    type t = term
+    let compare = compare
+end
+module Terms = Set.Make(Term)
+
+let string_of_terms terms =
+    Terms.fold (fun t s -> s ^ string_of_term t ^ ", ") terms ""
+
+module Label = struct
+    type t = label
+    let compare = compare
+end
+module AbsCache = struct
+    module Map = Map.Make(Label)
+    type t = Terms.t Map.t
+    let empty = Map.empty
+    let find l m = try Map.find l m with _ -> Terms.empty
+    let add l t m = Map.add l (Terms.union t (find l m)) m
+    let order m1 m2 = Map.for_all (fun l set -> Terms.subset set (find l m2)) m1
+    let print m =
+        Map.iter (fun l terms ->
+            print_endline (string_of_int l ^ " |-> " ^ string_of_terms terms)
+        ) m
+end
+module Var = struct
+    type t = string
+    let compare = compare
+end
+module AbsEnv = struct
+    module Map = Map.Make(Var)
+    type t = Terms.t Map.t
+    let empty = Map.empty
+    let find l m = try Map.find l m with _ -> Terms.empty
+    let add l t m = Map.add l (Terms.union t (find l m)) m
+    let order m1 m2 = Map.for_all (fun l set -> Terms.subset set (find l m2)) m1
+    let print m =
+        Map.iter (fun x terms ->
+            print_endline (x ^ " |-> " ^ string_of_terms terms)
+        ) m
+end
+
+let cfa : exp -> AbsCache.t * AbsEnv.t
+=fun exp -> (AbsCache.empty, AbsEnv.empty) (* TODO *)
