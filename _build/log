@@ -1,10 +1,10 @@
 # dune build
 # OCAMLPARAM: unset
 # Workspace root: /home/hdy/AAA616-2022Fall
-$ /usr/bin/nproc > /tmp/dune28f058.output 2> /dev/null
+$ /usr/bin/nproc > /tmp/duned5abb0.output 2> /dev/null
 # Auto-detected concurrency: 20
 # disable binary cache
-$ /usr/bin/ocamlc.opt -config > /tmp/dune345278.output
+$ /usr/bin/ocamlc.opt -config > /tmp/dune68f6ee.output
 # Dune context:
 #  { name = "default"
 #  ; kind = "default"
@@ -152,123 +152,6 @@ $ /usr/bin/ocamlc.opt -config > /tmp/dune345278.output
 #      ; windows_unicode = false
 #      }
 #  }
-$ (cd _build/default && /usr/bin/ocamlc.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -w -66 -g -bin-annot -I hw1/.interval.eobjs/byte -no-alias-deps -opaque -open Dune__exe -o hw1/.interval.eobjs/byte/dune__exe__Interval.cmo -c -impl hw1/interval.ml)
-> File "hw1/interval.ml", line 511, characters 16-20:
-> 511 |                 (**)
->                       ^^^^
-> Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)
-> File "hw1/interval.ml", line 516, characters 16-20:
-> 516 |                 (**)
->                       ^^^^
-> Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)
-> File "hw1/interval.ml", line 676, characters 14-18:
-> 676 |               (**)
->                     ^^^^
-> Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)
-> File "hw1/interval.ml", line 679, characters 14-18:
-> 679 |               (**)
->                     ^^^^
-> Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)
-> File "hw1/interval.ml", line 684, characters 14-18:
-> 684 |               (**)
->                     ^^^^
-> Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)
-> File "hw1/interval.ml", line 687, characters 14-18:
-> 687 |               (**)
->                     ^^^^
-> Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)
-> File "hw1/interval.ml", line 705, characters 14-18:
-> 705 |               (**)
->                     ^^^^
-> Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)
-> File "hw1/interval.ml", line 710, characters 14-18:
-> 710 |               (**)
->                     ^^^^
-> Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)
-> File "hw1/interval.ml", lines 179-180, characters 2-102:
-> 179 | ..let Seq(lst) = cmd in 
-> 180 |   let sp' = Node.create_skip() in let ep' = Node.create_skip() in (parsing lst init sp' ep' sp' false).
-> Error (warning 8 [partial-match]): this pattern-matching is not exhaustive.
-> Here is an example of a case that is not matched:
-> (Assign (_, _)|If (_, _, _)|While (_, _))
-> File "hw1/interval.ml", line 421, characters 10-39:
-> 421 |   let rec intersection : t -> t -> bool
->                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-> Error (warning 39 [unused-rec-flag]): unused rec flag.
-> File "hw1/interval.ml", line 555, characters 10-15:
-> 555 |   let rec order m1 m2 = 
->                 ^^^^^
-> Error (warning 39 [unused-rec-flag]): unused rec flag.
-> File "hw1/interval.ml", line 187, characters 14-16:
-> 187 |     | If     (b1, c2, c3)  -> cfg (*we do not have to handle this case*)
->                     ^^
-> Error (warning 27 [unused-var-strict]): unused variable b1.
-> File "hw1/interval.ml", line 187, characters 18-20:
-> 187 |     | If     (b1, c2, c3)  -> cfg (*we do not have to handle this case*)
->                         ^^
-> Error (warning 27 [unused-var-strict]): unused variable c2.
-> File "hw1/interval.ml", line 187, characters 22-24:
-> 187 |     | If     (b1, c2, c3)  -> cfg (*we do not have to handle this case*)
->                             ^^
-> Error (warning 27 [unused-var-strict]): unused variable c3.
-> File "hw1/interval.ml", line 455, characters 9-11:
-> 455 |     | Iv(a1, a2), Iv(b1, b2) -> 
->                ^^
-> Error (warning 27 [unused-var-strict]): unused variable a1.
-> File "hw1/interval.ml", line 455, characters 25-27:
-> 455 |     | Iv(a1, a2), Iv(b1, b2) -> 
->                                ^^
-> Error (warning 27 [unused-var-strict]): unused variable b2.
-> File "hw1/interval.ml", line 464, characters 13-15:
-> 464 |     | Iv(a1, a2), Iv(b1, b2) -> 
->                    ^^
-> Error (warning 27 [unused-var-strict]): unused variable a2.
-> File "hw1/interval.ml", line 464, characters 21-23:
-> 464 |     | Iv(a1, a2), Iv(b1, b2) -> 
->                            ^^
-> Error (warning 27 [unused-var-strict]): unused variable b1.
-> File "hw1/interval.ml", line 495, characters 39-40:
-> 495 |   let keys b = List.fold_right (fun (k,v) lst -> k::lst) b []
->                                              ^
-> Error (warning 27 [unused-var-strict]): unused variable v.
-> File "hw1/interval.ml", line 497, characters 6-11:
-> 497 |   let debug : string list -> string -> string 
->             ^^^^^
-> Error (warning 32 [unused-value-declaration]): unused value debug.
-> File "hw1/interval.ml", line 499, characters 10-12:
-> 499 |     | hd::tl -> s ^ hd 
->                 ^^
-> Error (warning 27 [unused-var-strict]): unused variable tl.
-> File "hw1/interval.ml", line 604, characters 55-56:
-> 604 | let update_option a = function | None -> Some a | Some x -> Some a  
->                                                              ^
-> Error (warning 27 [unused-var-strict]): unused variable x.
-> File "hw1/interval.ml", line 629, characters 30-32:
-> 629 |                       | Const n1, Const n2 -> mem (* bottom? or normal execution? *)
->                                     ^^
-> Error (warning 27 [unused-var-strict]): unused variable n1.
-> File "hw1/interval.ml", line 629, characters 40-42:
-> 629 |                       | Const n1, Const n2 -> mem (* bottom? or normal execution? *)
->                                               ^^
-> Error (warning 27 [unused-var-strict]): unused variable n2.
-> File "hw1/interval.ml", line 630, characters 30-31:
-> 630 |                       | Const n, Var s -> execute_bexp (Equal(a2, a1)) mem not 
->                                     ^
-> Error (warning 27 [unused-var-strict]): unused variable n.
-> File "hw1/interval.ml", line 630, characters 37-38:
-> 630 |                       | Const n, Var s -> execute_bexp (Equal(a2, a1)) mem not 
->                                            ^
-> Error (warning 27 [unused-var-strict]): unused variable s.
-> File "hw1/interval.ml", line 637, characters 30-32:
-> 637 |                       | Const n1, Const n2 -> mem (* bottom? or normal execution? *)
->                                     ^^
-> Error (warning 27 [unused-var-strict]): unused variable n1.
-> File "hw1/interval.ml", line 637, characters 40-42:
-> 637 |                       | Const n1, Const n2 -> mem (* bottom? or normal execution? *)
->                                               ^^
-> Error (warning 27 [unused-var-strict]): unused variable n2.
-> File "hw1/interval.ml", line 675, characters 18-19:
-> 675 |   | hd::tl -> let n, ins = hd in 
->                         ^
-> Error (warning 27 [unused-var-strict]): unused variable n.
-[2]
+$ (cd _build/default && /usr/bin/ocamlc.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -w -66 -g -bin-annot -I hw3/.hw3.eobjs/byte -no-alias-deps -opaque -o hw3/.hw3.eobjs/byte/dune__exe__Hw3.cmo -c -impl hw3/hw3.ml)
+$ (cd _build/default && /usr/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -w -66 -g -I hw3/.hw3.eobjs/byte -I hw3/.hw3.eobjs/native -intf-suffix .ml -no-alias-deps -opaque -o hw3/.hw3.eobjs/native/dune__exe__Hw3.cmx -c -impl hw3/hw3.ml)
+$ (cd _build/default && /usr/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -w -66 -g -o hw3/hw3.exe hw3/.hw3.eobjs/native/dune__exe__Hw3.cmx)
