@@ -82,5 +82,22 @@ module AbsEnv = struct
         ) m
 end
 
+let rec gen_equation : exp -> constraints
+= fun exp -> let term, label = exp in 
+    match term with 
+    | CONST i            -> [] 
+    | VAR   s            -> SUBSET(s, label)::[]
+    | FN    (s1, e2)     -> let temp = gen_equation e2 in SUBSET(term, label)::temp 
+    | RECFN (s1, s2, e3) -> let temp = gen_equation e2 in SUBSET(term, label)::(SUBSET(term, s1)::temp) 
+    | APP   (e1, e2)     -> let temp1 = gen_equation e1 in let temp2 = gen_equation e2 in 
+    | IF    (e1, e2, e3) ->
+    | LET   (s1, e2, e3) ->
+    | BOP   (o1, e2, e3) ->
+and app_aux : 
+
+let update : 
+
+let solve :
+
 let cfa : exp -> AbsCache.t * AbsEnv.t
 =fun exp -> (AbsCache.empty, AbsEnv.empty) (* TODO *)

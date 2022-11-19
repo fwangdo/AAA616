@@ -1,126 +1,80 @@
 # dune build
 # OCAMLPARAM: unset
-# Workspace root: /home/hdy/AAA616-2022Fall
-$ /usr/bin/nproc > /tmp/duned5abb0.output 2> /dev/null
-# Auto-detected concurrency: 20
-# disable binary cache
-$ /usr/bin/ocamlc.opt -config > /tmp/dune68f6ee.output
+# Shared cache: disabled
+# Workspace root: /Users/hdy/code/homework/AAA616
+# Auto-detected concurrency: 8
+$ /Users/hdy/.opam/4.10.2/bin/ocamlc.opt -config > /var/folders/cz/_crjdsc14g56k6plygjzqhc40000gn/T/dune_921394_output
 # Dune context:
 #  { name = "default"
 #  ; kind = "default"
-#  ; profile = Dyn
+#  ; profile = Dev
 #  ; merlin = true
 #  ; for_host = None
 #  ; fdo_target_exe = None
 #  ; build_dir = "default"
-#  ; toplevel_path = None
-#  ; ocaml_bin = External "/usr/bin"
-#  ; ocaml = Ok External "/usr/bin/ocaml"
-#  ; ocamlc = External "/usr/bin/ocamlc.opt"
-#  ; ocamlopt = Ok External "/usr/bin/ocamlopt.opt"
-#  ; ocamldep = Ok External "/usr/bin/ocamldep.opt"
-#  ; ocamlmklib = Ok External "/usr/bin/ocamlmklib.opt"
+#  ; toplevel_path = Some External "/Users/hdy/.opam/4.10.2/lib/toplevel"
+#  ; ocaml_bin = External "/Users/hdy/.opam/4.10.2/bin"
+#  ; ocaml = Ok External "/Users/hdy/.opam/4.10.2/bin/ocaml"
+#  ; ocamlc = External "/Users/hdy/.opam/4.10.2/bin/ocamlc.opt"
+#  ; ocamlopt = Ok External "/Users/hdy/.opam/4.10.2/bin/ocamlopt.opt"
+#  ; ocamldep = Ok External "/Users/hdy/.opam/4.10.2/bin/ocamldep.opt"
+#  ; ocamlmklib = Ok External "/Users/hdy/.opam/4.10.2/bin/ocamlmklib.opt"
 #  ; env =
 #      map
-#        { "CAML_LD_LIBRARY_PATH" :
-#            "/home/hdy/AAA616-2022Fall/_build/install/default/lib/stublibs"
-#        ; "DUNE_OCAML_HARDCODED" : "/usr/lib/ocaml"
-#        ; "DUNE_OCAML_STDLIB" : "/usr/lib/ocaml"
-#        ; "DUNE_SOURCEROOT" : "/home/hdy/AAA616-2022Fall"
-#        ; "INSIDE_DUNE" : "/home/hdy/AAA616-2022Fall/_build/default"
-#        ; "MANPATH" : "/home/hdy/AAA616-2022Fall/_build/install/default/bin"
+#        { "DUNE_OCAML_HARDCODED" : "/Users/hdy/.opam/4.10.2/lib"
+#        ; "DUNE_OCAML_STDLIB" : "/Users/hdy/.opam/4.10.2/lib/ocaml"
+#        ; "DUNE_SOURCEROOT" : "/Users/hdy/code/homework/AAA616"
+#        ; "INSIDE_DUNE" : "/Users/hdy/code/homework/AAA616/_build/default"
 #        ; "OCAMLFIND_IGNORE_DUPS_IN" :
-#            "/home/hdy/AAA616-2022Fall/_build/install/default/lib"
-#        ; "OCAMLPATH" : "/home/hdy/AAA616-2022Fall/_build/install/default/lib"
+#            "/Users/hdy/code/homework/AAA616/_build/install/default/lib"
+#        ; "OCAMLPATH" :
+#            "/Users/hdy/code/homework/AAA616/_build/install/default/lib"
 #        ; "OCAMLTOP_INCLUDE_PATH" :
-#            "/home/hdy/AAA616-2022Fall/_build/install/default/lib/toplevel"
+#            "/Users/hdy/code/homework/AAA616/_build/install/default/lib/toplevel"
 #        ; "OCAML_COLOR" : "always"
 #        ; "OPAMCOLOR" : "always"
 #        }
-#  ; findlib_path = [ External "/usr/lib/ocaml" ]
+#  ; findlib_paths = [ External "/Users/hdy/.opam/4.10.2/lib" ]
 #  ; arch_sixtyfour = true
 #  ; natdynlink_supported = true
 #  ; supports_shared_libraries = true
 #  ; ocaml_config =
-#      { version = "4.13.1"
-#      ; standard_library_default = "/usr/lib/ocaml"
-#      ; standard_library = "/usr/lib/ocaml"
+#      { version = "4.10.2"
+#      ; standard_library_default = "/Users/hdy/.opam/4.10.2/lib/ocaml"
+#      ; standard_library = "/Users/hdy/.opam/4.10.2/lib/ocaml"
 #      ; standard_runtime = "the_standard_runtime_variable_was_deleted"
 #      ; ccomp_type = "cc"
-#      ; c_compiler = "x86_64-linux-gnu-gcc"
-#      ; ocamlc_cflags =
-#          [ "-O2"
-#          ; "-fno-strict-aliasing"
-#          ; "-fwrapv"
-#          ; "-pthread"
-#          ; "-fPIC"
-#          ; "-g"
-#          ; "-O2"
-#          ; "-ffile-prefix-map=/build/ocaml-SC7b9w/ocaml-4.13.1=."
-#          ; "-fstack-protector-strong"
-#          ; "-Wformat"
-#          ; "-Werror=format-security"
-#          ]
-#      ; ocamlc_cppflags =
-#          [ "-D_FILE_OFFSET_BITS=64"; "-Wdate-time"; "-D_FORTIFY_SOURCE=2" ]
-#      ; ocamlopt_cflags =
-#          [ "-O2"
-#          ; "-fno-strict-aliasing"
-#          ; "-fwrapv"
-#          ; "-pthread"
-#          ; "-fPIC"
-#          ; "-g"
-#          ; "-O2"
-#          ; "-ffile-prefix-map=/build/ocaml-SC7b9w/ocaml-4.13.1=."
-#          ; "-fstack-protector-strong"
-#          ; "-Wformat"
-#          ; "-Werror=format-security"
-#          ]
-#      ; ocamlopt_cppflags =
-#          [ "-D_FILE_OFFSET_BITS=64"; "-Wdate-time"; "-D_FORTIFY_SOURCE=2" ]
+#      ; c_compiler = "cc"
+#      ; ocamlc_cflags = [ "-O2"; "-fno-strict-aliasing"; "-fwrapv" ]
+#      ; ocamlc_cppflags = [ "-D_FILE_OFFSET_BITS=64"; "-D_REENTRANT" ]
+#      ; ocamlopt_cflags = [ "-O2"; "-fno-strict-aliasing"; "-fwrapv" ]
+#      ; ocamlopt_cppflags = [ "-D_FILE_OFFSET_BITS=64"; "-D_REENTRANT" ]
 #      ; bytecomp_c_compiler =
-#          [ "x86_64-linux-gnu-gcc"
+#          [ "cc"
 #          ; "-O2"
 #          ; "-fno-strict-aliasing"
 #          ; "-fwrapv"
-#          ; "-pthread"
-#          ; "-fPIC"
-#          ; "-g"
-#          ; "-O2"
-#          ; "-ffile-prefix-map=/build/ocaml-SC7b9w/ocaml-4.13.1=."
-#          ; "-fstack-protector-strong"
-#          ; "-Wformat"
-#          ; "-Werror=format-security"
 #          ; "-D_FILE_OFFSET_BITS=64"
-#          ; "-Wdate-time"
-#          ; "-D_FORTIFY_SOURCE=2"
+#          ; "-D_REENTRANT"
 #          ]
 #      ; bytecomp_c_libraries = [ "-lm"; "-lpthread" ]
 #      ; native_c_compiler =
-#          [ "x86_64-linux-gnu-gcc"
+#          [ "cc"
 #          ; "-O2"
 #          ; "-fno-strict-aliasing"
 #          ; "-fwrapv"
-#          ; "-pthread"
-#          ; "-fPIC"
-#          ; "-g"
-#          ; "-O2"
-#          ; "-ffile-prefix-map=/build/ocaml-SC7b9w/ocaml-4.13.1=."
-#          ; "-fstack-protector-strong"
-#          ; "-Wformat"
-#          ; "-Werror=format-security"
 #          ; "-D_FILE_OFFSET_BITS=64"
-#          ; "-Wdate-time"
-#          ; "-D_FORTIFY_SOURCE=2"
+#          ; "-D_REENTRANT"
 #          ]
 #      ; native_c_libraries = [ "-lm" ]
+#      ; native_pack_linker = [ "ld"; "-r"; "-o" ]
 #      ; cc_profile = []
-#      ; architecture = "amd64"
+#      ; architecture = "arm64"
 #      ; model = "default"
 #      ; int_size = 63
 #      ; word_size = 64
-#      ; system = "linux"
-#      ; asm = [ "x86_64-linux-gnu-as" ]
+#      ; system = "macosx"
+#      ; asm = [ "clang"; "-c"; "-Wno-trigraphs" ]
 #      ; asm_cfi_supported = true
 #      ; with_frame_pointers = false
 #      ; ext_exe = ""
@@ -131,27 +85,30 @@ $ /usr/bin/ocamlc.opt -config > /tmp/dune68f6ee.output
 #      ; os_type = "Unix"
 #      ; default_executable_name = "a.out"
 #      ; systhread_supported = true
-#      ; host = "x86_64-pc-linux-gnu"
-#      ; target = "x86_64-pc-linux-gnu"
+#      ; host = "aarch64-apple-darwin21.5.0"
+#      ; target = "aarch64-apple-darwin21.5.0"
 #      ; profiling = false
 #      ; flambda = false
 #      ; spacetime = false
 #      ; safe_string = true
-#      ; exec_magic_number = "Caml1999X030"
-#      ; cmi_magic_number = "Caml1999I030"
-#      ; cmo_magic_number = "Caml1999O030"
-#      ; cma_magic_number = "Caml1999A030"
-#      ; cmx_magic_number = "Caml1999Y030"
-#      ; cmxa_magic_number = "Caml1999Z030"
-#      ; ast_impl_magic_number = "Caml1999M030"
-#      ; ast_intf_magic_number = "Caml1999N030"
-#      ; cmxs_magic_number = "Caml1999D030"
-#      ; cmt_magic_number = "Caml1999T030"
+#      ; exec_magic_number = "Caml1999X027"
+#      ; cmi_magic_number = "Caml1999I027"
+#      ; cmo_magic_number = "Caml1999O027"
+#      ; cma_magic_number = "Caml1999A027"
+#      ; cmx_magic_number = "Caml1999Y027"
+#      ; cmxa_magic_number = "Caml1999Z027"
+#      ; ast_impl_magic_number = "Caml1999M027"
+#      ; ast_intf_magic_number = "Caml1999N027"
+#      ; cmxs_magic_number = "Caml1999D027"
+#      ; cmt_magic_number = "Caml1999T027"
 #      ; natdynlink_supported = true
 #      ; supports_shared_libraries = true
 #      ; windows_unicode = false
 #      }
 #  }
-$ (cd _build/default && /usr/bin/ocamlc.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -w -66 -g -bin-annot -I hw3/.hw3.eobjs/byte -no-alias-deps -opaque -o hw3/.hw3.eobjs/byte/dune__exe__Hw3.cmo -c -impl hw3/hw3.ml)
-$ (cd _build/default && /usr/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -w -66 -g -I hw3/.hw3.eobjs/byte -I hw3/.hw3.eobjs/native -intf-suffix .ml -no-alias-deps -opaque -o hw3/.hw3.eobjs/native/dune__exe__Hw3.cmx -c -impl hw3/hw3.ml)
-$ (cd _build/default && /usr/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -w -66 -g -o hw3/hw3.exe hw3/.hw3.eobjs/native/dune__exe__Hw3.cmx)
+$ (cd _build/default && /Users/hdy/.opam/4.10.2/bin/ocamlc.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -w -66 -g -bin-annot -I hw3/.hw3.eobjs/byte -no-alias-deps -opaque -o hw3/.hw3.eobjs/byte/dune__exe__Hw3.cmo -c -impl hw3/hw3.ml)
+> File "hw3/hw3.ml", line 86, characters 5-8:
+> 86 | =fun exp -> (AbsCache.empty, AbsEnv.empty) (* TODO *)
+>           ^^^
+> Error (warning 27): unused variable exp.
+[2]
