@@ -82,18 +82,32 @@ module AbsEnv = struct
         ) m
 end
 
-let rec gen_equation : exp -> constraints
-= fun exp -> let term, label = exp in 
+(* collecting functions to use in gen_equation.
+   specifically, in APP case.*)
+let rec collect_func : exp -> term list
+= fun exp -> let (term, _) = exp in match term with 
+    | FN    _            -> [term] 
+    | RECFN _            -> [term] 
+    | APP   (e1, e2)     -> (collect_func e1)@(collect_func e2) 
+    | IF    (e1, e2, e3) -> (collect_func e1)@(collect_func e2)@(collect_func e3)
+    | LET   (_, e2, e3)  -> (collect_func e2)@(collect_func e3)
+    | BOP   (_, e2, e3)  -> (collect_func e2)@(collect_func e3)
+    | _                  -> []
+
+(* f*)
+let rec gen_equation : exp -> term list -> constraints
+= fun exp lst -> let term, label = exp in 
     match term with 
     | CONST i            -> [] 
-    | VAR   s            -> SUBSET(s, label)::[]
-    | FN    (s1, e2)     -> let temp = gen_equation e2 in SUBSET(term, label)::temp 
-    | RECFN (s1, s2, e3) -> let temp = gen_equation e2 in SUBSET(term, label)::(SUBSET(term, s1)::temp) 
-    | APP   (e1, e2)     -> let temp1 = gen_equation e1 in let temp2 = gen_equation e2 in 
+    | VAR   s            -> SUBSET(T(s), C(label))::[]
+    | FN    (s1, e2)     -> let temp = gen_equation e2 lst in (SUBSET(T(term), C(label)))::temp 
+    | RECFN (s1, s2, e3) -> let temp = gen_equation e2 lst in (SUBSET(T(term), C(label)))::(SUBSET(T(term), V(s1))::temp) 
+    (* | APP   (e1, e2)     -> let temp1 = gen_equation e1 lst in let temp2 = gen_equation e2 lst in 
     | IF    (e1, e2, e3) ->
     | LET   (s1, e2, e3) ->
-    | BOP   (o1, e2, e3) ->
-and app_aux : 
+    | BOP   (o1, e2, e3) -> *)
+and app_aux : exp -> exp -> label -> term list -> constraints
+= fun e1 e2 lst -> 
 
 let update : 
 
