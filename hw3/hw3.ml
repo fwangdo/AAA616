@@ -104,9 +104,13 @@ let rec gen_equation : exp -> term list -> constraints
     | RECFN (s1, s2, e3) -> let temp = gen_equation e3 lst in (SUBSET(T(term), C(label)))::(SUBSET(T(term), V(s1))::temp) 
     | APP   (e1, e2)     -> let temp1 = gen_equation e1 lst in let temp2 = gen_equation e2 lst in let temp = temp1@temp2 in 
                             let cond = app_aux e1 e2 label lst in cond@temp 
+    | IF    (e1, e2, e3) -> let temp1 = gen_equation e1 lst in let temp2 = gen_equation e2 lst in let temp3 = gen_equation e3 lst in 
+                            let (_, l2) = e2 in let (_, l3) = e3 in let con1 = SUBSET(C(l2), C(label)) in let con2 = SUBSET(C(l3), C(label)) in 
+                            con1::con2::(temp1@temp2@temp3)
+    | LET   (s1, e2, e3) -> let temp1 = gen_equation e2 lst in let temp2 = gen_equation e3 lst in  
+                            let (_, l2) = e2 in let (_, l3) = e3 in let con1 = SUBSET(C(l2), V(s1)) in let con2 = SUBSET(C(l2), C(label)) in 
+                            con1::con2::(temp1@temp2)
     (*TODO*)
-    | IF    (e1, e2, e3) -> raise (Failure "undefined") 
-    | LET   (s1, e2, e3) -> raise (Failure "undefined") 
     | BOP   (o1, e2, e3) -> raise (Failure "undefined")
 and app_aux : exp -> exp -> label -> term list -> constraints
 = fun e1 e2 l lst -> 
