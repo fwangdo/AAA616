@@ -99,16 +99,27 @@ let rec gen_equation : exp -> term list -> constraints
 = fun exp lst -> let term, label = exp in 
     match term with 
     | CONST i            -> [] 
-    | VAR   s            -> SUBSET(T(s), C(label))::[]
+    | VAR   s            -> SUBSET(V(s), C(label))::[]
     | FN    (s1, e2)     -> let temp = gen_equation e2 lst in (SUBSET(T(term), C(label)))::temp 
-    | RECFN (s1, s2, e3) -> let temp = gen_equation e2 lst in (SUBSET(T(term), C(label)))::(SUBSET(T(term), V(s1))::temp) 
-    (* | APP   (e1, e2)     -> let temp1 = gen_equation e1 lst in let temp2 = gen_equation e2 lst in 
-    | IF    (e1, e2, e3) ->
-    | LET   (s1, e2, e3) ->
-    | BOP   (o1, e2, e3) -> *)
+    | RECFN (s1, s2, e3) -> let temp = gen_equation e3 lst in (SUBSET(T(term), C(label)))::(SUBSET(T(term), V(s1))::temp) 
+    | APP   (e1, e2)     -> let temp1 = gen_equation e1 lst in let temp2 = gen_equation e2 lst in let temp = temp1@temp2 in 
+                            let cond = app_aux e1 e2 label lst in cond@temp 
+    (*TODO*)
+    | IF    (e1, e2, e3) -> raise (Failure "undefined") 
+    | LET   (s1, e2, e3) -> raise (Failure "undefined") 
+    | BOP   (o1, e2, e3) -> raise (Failure "undefined")
 and app_aux : exp -> exp -> label -> term list -> constraints
-= fun e1 e2 lst -> 
-
+= fun e1 e2 l lst -> 
+  let (_, l1) = e1 in let (_, l2) = e2 in match lst with (* materials are prepared *) 
+    | hd::tl -> begin match hd with 
+        | FN(s1, (_, l0))       -> let temp1 = COND(T(hd), C(l1), C(l2), V(s1)) in
+                                   let temp2 = COND(T(hd), C(l1), C(l0), C(l))  in temp1::temp2::(app_aux e1 e2 l tl) 
+        | RECFN(s1, _, (_, l0)) -> let temp1 = COND(T(hd), C(l1), C(l2), V(s1)) in 
+                                   let temp2 = COND(T(hd), C(l1), C(l0), C(l))  in temp1::temp2::(app_aux e1 e2 l tl)
+        | _                     -> raise (Failure "undefined")
+        end
+    | _      -> [] 
+  
 let update : 
 
 let solve :
