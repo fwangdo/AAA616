@@ -110,8 +110,7 @@ let rec gen_equation : exp -> term list -> constraints
     | LET   (s1, e2, e3) -> let temp1 = gen_equation e2 lst in let temp2 = gen_equation e3 lst in  
                             let (_, l2) = e2 in let (_, l3) = e3 in let con1 = SUBSET(C(l2), V(s1)) in let con2 = SUBSET(C(l2), C(label)) in 
                             con1::con2::(temp1@temp2)
-    (*TODO*)
-    | BOP   (o1, e2, e3) -> raise (Failure "undefined")
+    | BOP   (o1, e2, e3) -> let temp1 = gen_equation e2 lst in let temp2 = gen_equation e3 lst in temp1@temp2 
 and app_aux : exp -> exp -> label -> term list -> constraints
 = fun e1 e2 l lst -> 
   let (_, l1) = e1 in let (_, l2) = e2 in match lst with (* materials are prepared *) 
@@ -124,9 +123,31 @@ and app_aux : exp -> exp -> label -> term list -> constraints
         end
     | _      -> [] 
   
-let update : 
+(* Check intermediate result. *)
+let rec string_of_eqn : eqn -> string 
+= fun eqn -> match eqn with 
+  | SUBSET (d1, d2)         -> (string_of_data d1) ^ " =< " ^ (string_of_data d2) 
+  | COND   (d1, d2, d3, d4) -> (string_of_eqn (SUBSET(d1,d2))) ^ " -> " ^ (string_of_eqn (SUBSET(d3, d4))) 
+and string_of_data : data -> string 
+= fun data -> match data with 
+  | T t -> "T " ^ string_of_term t
+  | C l -> "C " ^ string_of_int l 
+  | V s -> "V " ^ s
 
-let solve :
+let rec string_of_eqns : eqn list -> string option 
+= fun lst -> match lst with 
+  | hd::tl -> print_endline (string_of_eqn hd); string_of_eqns tl  
+  | _ -> None 
+
+let func_list = collect_func ex1
+let res = gen_equation ex1 func_list 
+let _ = string_of_eqns res 
+
+
+(* let update : 
+
+let solve : exp -> (AbsCache.t * AbsEnv.t) -> (AbsCache.t * AbsEnv.t)
+= fun exp ()
 
 let cfa : exp -> AbsCache.t * AbsEnv.t
-=fun exp -> (AbsCache.empty, AbsEnv.empty) (* TODO *)
+=fun exp -> (AbsCache.empty, AbsEnv.empty)  *)
