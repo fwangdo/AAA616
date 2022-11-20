@@ -172,27 +172,49 @@ end
   
  lp, ep means loop point and end point
  pr means pred
+ loop means in loop or not.
 *)
+
+let take_pgm : cmd -> cmd list 
+= function | Seq(lst) -> lst | _ -> (raise (Failure "Impossible case"))
+
+let rec seperate_bool : bexp -> Node.t -> Node.t list -> Cfg.t -> (Node.t * Node.t list * Cfg.t)
+= fun bexp sp lst cfg -> match bexp with 
+  | True -> let suss = (Node.create_assume bexp) in (suss, lst, (Cfg.add_edge sp suss cfg))  
+  | False -> let fail = (Node.create_assume bexp) in (fail, lst, (Cfg.add_edge sp fail cfg)) 
+  | Equal (a1, a2) -> let suss = Node.create_assume bexp in let fail = Node.create_assume (Not bexp) in (suss ,fail::lst, (Cfg.add_edge sp suss cfg))
+  | Le (a1, a2) -> let suss = Node.create_assume bexp in let fail = Node.create_assume (Not bexp) in (suss, fail::lst, (Cfg.add_edge sp suss cfg))
+  | Not b1 -> let suss = Node.create_assume bexp in let fail = Node.create_assume (Not bexp) in (suss, fail::lst, (Cfg.add_edge sp suss cfg))
+  | And (b1, b2) -> let (suss, lst1, cfg1) = seperate_bool b1 sp lst cfg in let (suss', lst2, cfg2) = seperate_bool b2 suss lst1 cfg1 in (suss', lst2, cfg2) 
 
 let rec cmd2cfg : cmd -> Cfg.t 
 = fun cmd -> let init = Cfg.empty in 
-  let Seq(lst) = cmd in 
+  let lst = take_pgm cmd in 
   let sp' = Node.create_skip() in let ep' = Node.create_skip() in (parsing lst init sp' ep' sp' false) 
 and parsing : cmd list -> Cfg.t -> Node.t -> Node.t -> Node.t -> bool -> Cfg.t   
 = fun smt cfg lp ep pr loop -> match smt with
  | hd::tl -> begin match hd with 
     | Assign (s1, a2)      -> let cur = Node.create_assign s1 a2 in Cfg.add_edge pr cur (parsing tl cfg lp ep cur loop)
     | Seq    (l1)          -> let sp' = Node.create_skip() in let ep' = Node.create_skip() in  
-                              let cfg' = Cfg.add_edge pr sp' cfg in parsing l1 cfg' lp ep' sp' loop 
-    | If     (b1, c2, c3)  -> cfg (*we do not have to handle this case*)
+                              let cfg' = Cfg.add_edge pr sp' cfg in 
+                              if loop then parsing l1 cfg' lp ep' sp' loop 
+                              else let cfg'' = Cfg.add_edge ep' ep cfg' in parsing l1 cfg'' lp ep' sp' loop 
+    | If     (b1, c2, c3)  -> let sp' = Node.create_skip() in let ep' = Node.create_skip() in
+                              let pass = Node.create_assume b1 in let npass = Node.create_assume(Not (b1)) in 
+                              let cfg' = Cfg.add_edge pr sp' cfg in 
+                              let cfg'' = Cfg.add_edge sp' pass cfg' in 
+                              let cfg''' = (parsing [c2] cfg'' lp ep' pass false) in (* this seq is not in loop *) 
+                              let cfg'''' = Cfg.add_edge sp' npass cfg''' in 
+                              let cfg''''' = (parsing [c3] cfg'''' lp ep' npass false) in 
+                              parsing tl cfg''''' lp ep ep' loop  
     | While  (b1, c2)      -> let sp' = Node.create_skip() in let ep' = Node.create_skip() in
-                              let pass = Node.create_assume b1 in let term = Node.create_assume(Not (b1)) in  
+                              let pass = Node.create_assume b1 in let npass = Node.create_assume(Not (b1)) in  
                               let cfg = Cfg.add_edge pr sp' cfg in (* connect 4 to 5*)
                               let cfg' = Cfg.add_edge sp' pass cfg in 
-                              let cfg'' = (parsing [c2] cfg' sp' ep pass true) in 
-                              let cfg''' = Cfg.add_edge sp' term cfg'' in
-                              let cfg'''' = (parsing tl cfg''' lp ep' term loop) in 
-                              Cfg.add_edge ep' ep cfg'''' 
+                              let cfg'' = (parsing [c2] cfg' sp' ep' pass true) in 
+                              let cfg''' = Cfg.add_edge sp' npass cfg'' in
+                              let cfg'''' = (parsing tl cfg''' lp ep' npass loop) in 
+                              if loop then cfg'''' else Cfg.add_edge ep' ep cfg'''' (* connect 10 to 5 *) 
   end
   | _ -> let cfg' = Cfg.add_edge pr ep cfg in if loop then Cfg.add_edge ep lp cfg' else cfg'
 (****)
@@ -473,6 +495,7 @@ module type AbsMem = sig
   val add : string -> Interval.t -> t -> t
   val find : string -> t -> Interval.t 
   val join : t -> t -> t 
+  val meet : t -> t -> t 
   val widen : t -> t -> t 
   val narrow : t -> t -> t
   val order : t -> t -> bool 
@@ -532,7 +555,16 @@ module AbsMem : AbsMem = struct
     let m2_keys = keys m2' in  
     let keys = union_keys m1_keys m2_keys in 
     let m3 = empty in calc (Interval.join) m1 m2 keys m3 
-   
+    
+   let meet : t -> t -> t 
+   = fun m1 m2 -> 
+    let m1' = VarMap.bindings m1 in 
+    let m2' = VarMap.bindings m2 in 
+    let m1_keys = keys m1' in
+    let m2_keys = keys m2' in  
+    let keys = union_keys m1_keys m2_keys in 
+    let m3 = empty in calc (Interval.meet) m1 m2 keys m3  
+
   let widen m1 m2 = 
     (* let _  = print_endline __FUNCTION__ in  *)
     let m1' = VarMap.bindings m1 in 
@@ -563,7 +595,6 @@ module AbsMem : AbsMem = struct
 
 end
 
-
 module type Table = sig
   type t = AbsMem.t NodeMap.t
   val empty : t
@@ -590,6 +621,7 @@ end
 = fun (var, iv) mem -> let before = AbsMem.find var mem in 
   VarMap.update var (f before iv) mem *)
 
+(* I could have used 'meet' but I wrote additional function. *)
 let handle_le : Interval.t -> int -> bool -> Interval.t
 = fun iv i ord -> 
   let ii = Interval.Con i in 
@@ -623,16 +655,30 @@ and execute_aexp : aexp -> AbsMem.t -> Interval.t
 (* this one will return memory itself.*)
 and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
 = fun exp mem not -> match exp with (* n_not means the number of not *) 
-  | True           -> mem 
-  | False          -> mem 
+  | True           -> if not then AbsMem.empty else mem 
+  | False          -> if not then mem else AbsMem.empty
   | Equal (a1, a2) -> (match a1, a2 with
-                      | Const n1, Const n2 -> mem (* bottom? or normal execution? *)
+                      | Const n1, Const n2 -> if not then (if n1 = n2 then AbsMem.empty else mem) else (if n1 = n2 then mem else AbsMem.empty)
                       | Const n, Var s -> execute_bexp (Equal(a2, a1)) mem not 
-                      | Var s, Const n ->
+                      | Var s, Const n -> let temp = AbsMem.find s mem in
                         if not 
-                        then VarMap.update s (update_option Interval.Top) mem  
-                        else VarMap.update s (update_option (Interval.alpha n)) mem
-                      | _, _ -> raise (Failure "undefined"))  
+                        then  let output = (match temp with 
+                                | Iv (Con a, Con b) -> if (a = n) && (b = n) then Interval.Bot else(
+                                                        if a = b then temp 
+                                                        else if a = n then Iv (Interval.Con (a+1), Interval.Con b)
+                                                        else if b = n then Iv (Interval.Con a, Interval.Con (b-1))  
+                                                        else temp)
+                                | Iv (N_inf, Con b) -> if b = n then Iv (N_inf, Con (b-1)) else temp
+                                | Iv (Con a, P_inf) -> if a = n then Iv (Con (a+1), P_inf) else temp
+                                | Iv (N_inf, P_inf) -> temp
+                                | Bot -> Bot
+                                | Top -> Top
+                                | _ -> raise (Failure "Impossible case in not equal case.")) in VarMap.update s (update_option output) mem  
+                        else let new_val = Interval.meet temp (Interval.alpha n) in VarMap.update s (update_option new_val) mem 
+                      | Var s1, Var s2 -> let s1' = VarMap.find s1 mem in let s2' = VarMap.find s2 mem in 
+                                          if not then mem 
+                                          else (let new_val = Interval.meet s1' s2' in let mem' = VarMap.update s1 (update_option new_val) mem in VarMap.update s2 (update_option new_val) mem')
+                      | _, _ -> update_mem exp mem)  
   | Le    (a1, a2) -> (match a1, a2 with
                       | Const n1, Const n2 -> mem (* bottom? or normal execution? *)
                       | Const n, Var s -> 
@@ -641,10 +687,125 @@ and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
                       | Var s, Const n ->
                         if not then execute_bexp (Le(Const(n+1), Var s)) mem false  
                                else let new_iv = (handle_le (AbsMem.find s mem) n true) in VarMap.update s (update_option new_iv) mem
-                      | _, _ -> raise (Failure "undefined")) 
+                      | _, _ -> update_mem exp mem)
   | Not   b        -> execute_bexp b mem (if not then false else true) (* then -> double negation. *)  
   | And   (b1, b2) -> if not then let mem' = execute_bexp b1 mem not in let mem'' = execute_bexp b2 mem not in AbsMem.join mem' mem''  
-                      else let mem' = execute_bexp b1 mem not in execute_bexp b2 mem' not 
+                      else let temp1 = execute_bexp b1 mem not in let temp2 = execute_bexp b2 mem not in (AbsMem.meet temp1 temp2)
+(* To consider relation between variables. *)
+(* need to fix code to consider order and le cases.*)
+and update_mem : bexp -> AbsMem.t -> AbsMem.t 
+= fun bexp mem -> 
+  match bexp with 
+  (* need to handle a case where there is no var. *)
+  | Equal (a1, a2) -> let left = find_var a1 [] in let right = find_var a2 [] in  
+                      if ((left@right) |> List.length) = 0 then mem else
+                      (let rcd = composition left a1 a2 true true mem mem in composition right a1 a2 false true mem rcd)   
+  | Le    (a1, a2) -> let left = find_var a1 [] in let right = find_var a2 [] in 
+                      if ((left@right) |> List.length) = 0 then mem else
+                      (let rcd = composition left a1 a2 true false mem mem in composition right a1 a2 false false mem rcd)
+  | _ -> mem
+and update_aux : (aexp * Interval.t * bool) -> isEqual:bool -> mem:AbsMem.t -> (string * Interval.t) 
+= fun (var, iv, isLeft) ~isEqual ~mem -> let name = (function | Var s -> s | _ -> raise (Failure "Error in name")) var in 
+  if isEqual then (let temp = eq_aux name iv mem in (name, temp)) 
+  else (let temp = le_aux name iv isLeft mem in (name, temp))   
+and eq_aux : string -> Interval.t -> AbsMem.t -> Interval.t
+= fun name iv mem -> let s_value = AbsMem.find name mem in match s_value, iv with 
+  | Bot, _ -> Bot 
+  | _, Bot -> Bot 
+  | Top, b -> b 
+  | _, Top -> Top
+  | a, b   -> Interval.meet a b 
+(* need unit test. *)
+and le_aux : string -> Interval.t -> bool -> AbsMem.t -> Interval.t 
+= fun name iv isLeft mem -> let s_value = AbsMem.find name mem in 
+    if isLeft then 
+    (match (s_value, iv) with  
+    | Bot, _ -> Bot
+    | _, Bot -> Bot
+    | Top, Top -> Top 
+    | Top, Iv(a,b) -> Iv(N_inf, b) 
+    | Iv(a,b), Top -> s_value 
+    | Iv(a1,a2), Iv(b1,b2) -> if not(Interval.comp a1 b2) then Bot else (
+                              let new_a = a1 in  
+                              let new_b = if (Interval.comp a2 b2) then a2 else b2 in Iv(new_a, new_b)))
+    else 
+    (match (iv, s_value) with  
+    | Bot, _ -> Bot
+    | _, Bot -> Bot
+    | Top, Top -> Top 
+    | Top, Iv(a,b) -> Top 
+    | Iv(a,b), Top -> Iv(a, P_inf) 
+    | Iv(a1,a2), Iv(b1,b2) -> if not(Interval.comp a1 b2) then Bot else (
+                              let new_a = if (Interval.comp a1 b1) then b1 else a1 in 
+                              let new_b = b2 in Iv(new_a, new_b)))
+(* this func composes trans_aux with inter_execute *)
+and composition : aexp list -> aexp -> aexp -> bool -> bool -> AbsMem.t -> AbsMem.t -> AbsMem.t 
+= fun lst left right isLeft isEqual mem rcd -> match lst with (* rcd means record. *) 
+  | hd::tl -> let (name, iv) = (trans_aux hd left right isLeft) |> (inter_execute ~mem:mem) |> (update_aux ~isEqual:isEqual ~mem:mem) in 
+              let rcd' = VarMap.update name (update_option iv) rcd in composition tl left right isLeft isEqual mem rcd'
+  | _      -> rcd 
+(*right should be calculated more. then, need to applied to execute_aexp. *)
+and inter_execute : (aexp * aexp * bool) -> mem:AbsMem.t -> (aexp * Interval.t * bool)
+= fun (left, right, isLeft) ~mem -> let va = execute_aexp right mem in match left, right with (* left is the one should be updated. *) 
+  | Var s, _ -> (Var s, va, isLeft)  
+  | Mult (Var s, Const z), _ -> let divided = div_aux va z in (Var s, divided, isLeft)
+  | Mult (Const z, Var s), _ -> let divided = div_aux va z in (Var s, divided, isLeft)
+  | _ -> raise (Failure "Error in inter execute: Impossible case.")
+and trans_aux : aexp -> aexp -> aexp -> bool -> (aexp * aexp * bool) (* example of output, 2(x + z) = 4y + 8z => x = 2y + 6z. *)
+= fun var left right isLeft -> let name = (function | Var s -> s | _ -> raise (Failure "Error in name")) var in (* if isLeft is true, then position of var is left. otherwise, vars is located in right of exp. *)
+  (* print_endline ("Var: " ^ name ^ "," ^ "Left: " ^ (string_of_aexp left) ^ "," ^ "Right: " ^ (string_of_aexp right)); *)
+  (if isLeft 
+  then (match left with
+  | Mult (Var s, Const mul) -> if name = s then (left, right, true) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
+  | Mult (Const mul, Var s) -> if name = s then (left, right, true) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
+  | Var s                   -> if name = s then (left, right, true) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
+  | Plus (a1, a2) -> if find_aux var a1 then let new_right = Sub (right, a2) in trans_aux var a1 new_right isLeft else let new_right = Sub (right, a1) in trans_aux var a2 new_right isLeft 
+  | Sub  (a1, a2) -> if find_aux var a1 then let new_right = Plus (right, a2) in trans_aux var a1 new_right isLeft else let new_right = Sub (right, a1) in trans_aux var (Mult (new_right, Const (-1))) (Mult (a2, Const (-1))) false (* important *) 
+  | Mult (a1, a2) -> if find_aux var a1 then trans_aux var (mult_aux a1 a2) right isLeft else trans_aux var (mult_aux a2 a1) right isLeft
+  | _ -> raise (Failure "Error in trans_aux: Const found")) 
+  else (match right with (* result : left is the one would be updated, right is just material *)
+  | Mult (Var s, Const mul) -> if name = s then (right, left, false) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
+  | Mult (Const mul, Var s) -> if name = s then (right, left, false) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
+  | Var s                   -> if name = s then (right, left, false) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
+  | Plus (a1, a2) -> if find_aux var a1 then let new_left = Sub (left, a2) in trans_aux var new_left a1 isLeft else let new_left = Sub (left, a1) in trans_aux var new_left a2 isLeft 
+  | Sub  (a1, a2) -> if find_aux var a1 then let new_left = Plus (left, a2) in trans_aux var new_left a1 isLeft else let new_left = Sub (left, a1) in trans_aux var (Mult (a2, Const (-1))) (Mult (new_left, Const (-1))) true (* important *) 
+  | Mult (a1, a2) -> if find_aux var a1 then trans_aux var left (mult_aux a1 a2) isLeft else trans_aux var left (mult_aux a2 a1) isLeft
+  | _ -> raise (Failure "Error in trans_aux: Const found"))) 
+and mult_aux : aexp -> aexp -> aexp (* multipled -> multiplying -> result *)
+= fun obj sub -> match obj with 
+  | Const i       -> Mult (obj, sub) 
+  | Var   s       -> Mult (obj, sub) 
+  | Plus (a1, a2) -> Plus ((Mult (a1, sub)), (Mult (a2, sub))) 
+  | Mult (a1, a2) -> Mult ((Mult (a1, sub)), (Mult (a2, sub))) 
+  | Sub  (a1, a2) -> Sub ((Mult (a1, sub)), (Mult (a2, sub))) 
+and find_aux : aexp -> aexp -> bool 
+= fun var aexp -> let name = (function | Var s -> s | _ -> raise (Failure "Error in name")) var in match aexp with 
+  | Const i       -> false 
+  | Var   s       -> if name = s then true else false  
+  | Plus (a1, a2) -> (find_aux var a1) || (find_aux var a2)
+  | Mult (a1, a2) -> (find_aux var a1) || (find_aux var a2)
+  | Sub  (a1, a2) -> (find_aux var a1) || (find_aux var a2)
+and find_var : aexp -> aexp list -> aexp list (* will give you the vars with position(e.g. left, right.)*) 
+= fun aexp lst -> match aexp with 
+  | Const i       -> lst 
+  | Var   s       -> aexp::lst 
+  | Plus (a1, a2) -> (find_var a1 lst) @ (find_var a2 lst)
+  | Mult (a1, a2) -> (find_var a1 lst) @ (find_var a2 lst)
+  | Sub  (a1, a2) -> (find_var a1 lst) @ (find_var a2 lst)
+and div_aux : Interval.t -> int -> Interval.t 
+= fun iv div -> match iv with 
+  | Interval.Bot -> Interval.Bot 
+  | Interval.Top -> Interval.Top
+  | Interval.Iv(a, b) -> 
+    (match a, b with
+    | N_inf, P_inf       -> iv
+    | N_inf, Con b'    -> Interval.Iv(a, Con (b' / div)) 
+    | Con a', P_inf    -> Interval.Iv(Con (a' / div), b) 
+    | Con a', Con b' -> let new_a = (a' / div) in let new_b = (b' / div) in let divided = Interval.Iv(Con new_a, Con new_b) in 
+                           (if ((new_a = new_b) && ((a' mod div) <> 0)) then Interval.Bot else divided) 
+    | _ -> raise (Failure "Error in div_aux : Impossible cases "))
+(* check whether divided has at least one multiple of'div'. if not so, it's bottom. *) 
+
 (* consider relations between variables in eq, le. *)
 (* and aux_bexp : aexp -> aexp -> (aexp * Interval.t) list  
 = fun a1 a2 lst -> match a1, a2 with 
@@ -659,6 +820,7 @@ and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
 
 (* for all variable to have interal with considering relations. *)
 (* and transposition : aexp -> aexp -> (aexp * aexp) *)
+
 let rec first_fhat : Node.t list -> Cfg.t -> Table.t -> Table.t
 = fun lst cfg tab -> match lst with 
   | hd::tl -> let n, ins = hd in 
@@ -736,10 +898,126 @@ let pgm =
   ]
 
 (* additional examples *)
+let pgm2 = 
+  Seq [
+    Assign ("x", Const 0); 
+    Assign ("y", Const 0);
+    While (Not( Le (Const 10, Var "x")), 
+      Seq [
+        Assign ("x", Plus (Var "x", Const 1)); 
+        Assign ("y", Plus (Var "y", Const 1)); 
+      ]);
+  ]
 
+let pgm3 = 
+  Seq [
+    Assign ("x", Const 0);
+    Assign ("y", Const 0);
+    If (Equal (Var "x", Const 0),
+      Seq [
+        Assign ("x", Plus (Var "x", Const 1)); 
+        Assign ("y", Plus (Var "y", Const 1)); 
+      ],
+      Seq [
+        Assign ("x", Plus (Var "x", Const 2)); 
+        Assign ("y", Plus (Var "y", Const 2)); 
+      ]);
+    Assign ("x", Plus (Var "x", Const 1)); 
+  ]
 
-let cfg = cmd2cfg pgm
-(* let _ = Cfg.print cfg *)
-(* let _ = Cfg.dot cfg *)
+let pgm4 = 
+  Seq [
+    Assign ("x", Const 0);
+    Assign ("y", Const 0);
+    If (Not (Equal (Var "x", Const 0)),
+      Seq [
+        Assign ("x", Plus (Var "x", Const 1)); 
+        Assign ("y", Plus (Var "y", Const 1)); 
+      ],
+      Seq [
+        Assign ("x", Plus (Var "x", Const 2)); 
+        Assign ("y", Plus (Var "y", Const 2)); 
+      ]);
+    Assign ("x", Plus (Var "x", Const 1)); 
+  ]
+
+(* double while loop *)
+let pgm5 = 
+  Seq [
+    Assign ("x", Const 0); 
+    Assign ("y", Const 0);
+    While (Le (Var "x", Const 9), 
+        While (Le (Var "y", Const 9), 
+          Seq [
+            Assign ("x", Plus (Var "x", Const 1)); 
+            Assign ("y", Plus (Var "y", Const 1)); 
+          ]););
+    ]
+  
+let pgm6 = 
+  Seq [
+    Assign ("x", Const 0); 
+    Assign ("y", Const 0);
+    While (And (Le (Var "x", Const 9), Le (Var "y", Const 9)), 
+      Seq [
+        Assign ("x", Plus (Var "x", Const 1)); 
+        Assign ("y", Plus (Var "y", Const 1)); 
+      ]);
+  ]
+
+(* these two pgms are the last cases that I should handle. *)
+let pgm7 = 
+  Seq [
+    Assign ("x", Const 1);
+    Assign ("y", Const 2);
+    Assign ("z", Const 4);
+    If ((Equal ((Mult(Var "x", Const 6)), (Plus(Var "y", Var "z")))),
+      Seq [
+        Assign ("x", Plus (Var "x", Const 1)); 
+      ],
+      Seq []);
+    Assign ("y", Plus (Var "y", Const 11)); 
+  ]
+
+let pgm8 = 
+  Seq [
+    Assign ("x", Const 1);
+    Assign ("y", Const 2);
+    Assign ("z", Const 3);
+    If ((Le (Mult(Var "x", Const 3), (Plus(Var "y", Var "z")))),
+      Seq [
+        Assign ("x", Plus (Var "x", Const 1)); 
+      ],
+      Seq []);
+    Assign ("y", Plus (Var "y", Const 11)); 
+  ]
+
+let pgm9 = 
+  Seq [
+    Assign ("x", Const 1);
+    Assign ("y", Const 6);
+    Assign ("z", Const 3);
+    If ((Le (Mult(Var "x", Const 3), (Plus(Var "y", Var "z")))),
+      Seq [
+        Assign ("x", Plus (Var "x", Const 1)); 
+      ],
+      Seq []);
+    Assign ("y", Plus (Var "y", Const 11)); 
+  ]
+
+let pgm10 = 
+  Seq [
+    Assign ("x", Const 1);
+    Assign ("y", Const 6);
+    If (And ((Not False), (And (True, (Equal (Var "x", Var "y"))))),
+      Seq [
+        Assign ("x", Plus (Var "x", Const 1)); 
+      ],
+      Seq []);
+    Assign ("y", Plus (Var "y", Const 11)); 
+  ]
+let cfg = cmd2cfg pgm7
+let _ = Cfg.print cfg
+let _ = Cfg.dot cfg
 let table = analyze cfg 
 let _ = Table.print table

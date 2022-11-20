@@ -143,11 +143,32 @@ let func_list = collect_func ex1
 let res = gen_equation ex1 func_list 
 let _ = string_of_eqns res 
 
+(* AbsCache.t * AbsEnv.t are S in pdf *)
+let rec update : eqn list -> (AbsCache.t * AbsEnv.t) -> (AbsCache.t * AbsEnv.t)
+= fun lst (cache, env) -> match lst with  
+  | hd::tl -> 
+    begin match hd with 
+      | SUBSET (d1, d2) -> let d2' = get_term d2 in  
+        begin match d1 with 
+        | C l -> let cache' = AbsCache.add l d2' cache in (cache', env)
+        | V s -> let env'   = AbsEnv.add s d2' env in (cache, env') 
+        | T t -> let func   = get_func_name t in let env' = AbsEnv.add func d2' env in (cache, env') 
+        end 
+      | COND   (d1, d2, d3, d4) -> 
+  end
+  | _ -> (cache, env)
+and get_term      = function | T x -> x | C x -> raise (Failure "Impossibe case in update")  | V x -> raise (Failure "Impossibe case in update")
+and get_func_name = function | FN (s1, _) -> s1 | RECFN (s1, _, _) -> s1 | _ -> raise (Failure "Impossible case in get func name")
 
-(* let update : 
-
-let solve : exp -> (AbsCache.t * AbsEnv.t) -> (AbsCache.t * AbsEnv.t)
-= fun exp ()
+let rec solve : eqn list -> (AbsCache.t * AbsEnv.t) -> (AbsCache.t * AbsEnv.t)
+= fun lst (cache, env) -> 
+  let s' = update lst s in let (cache', env') = s' in  
+  if (AbsCache.order cache cache') && (AbsEnv.order env env') then s 
+  else solve lst s'
 
 let cfa : exp -> AbsCache.t * AbsEnv.t
-=fun exp -> (AbsCache.empty, AbsEnv.empty)  *)
+=fun exp -> solve exp (AbsCache.empty, AbsEnv.empty) 
+
+let _ = cfa ex1 in 
+let _ = cfa ex2 in 
+let _ = cfa ex3
