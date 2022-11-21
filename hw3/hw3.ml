@@ -144,6 +144,7 @@ let res = gen_equation ex1 func_list
 let _ = string_of_eqns res 
 
 (* AbsCache.t * AbsEnv.t are S in pdf *)
+(* Think abou case where Union SUBSET SUBSET *)
 let rec update : eqn list -> (AbsCache.t * AbsEnv.t) -> (AbsCache.t * AbsEnv.t)
 = fun lst (cache, env) -> match lst with  
   | hd::tl -> 
