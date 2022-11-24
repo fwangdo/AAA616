@@ -131,7 +131,7 @@ and app_aux : exp -> exp -> label -> term list -> constraints
 (* Check intermediate result. *)
 let rec string_of_eqn : eqn -> string 
 = fun eqn -> match eqn with 
-  | SUBSET (d1, d2)         -> (string_of_data d1) ^ " (( " ^ (string_of_data d2) 
+  | SUBSET (d1, d2)         -> (string_of_data d1) ^ " << " ^ (string_of_data d2) 
   | COND   (d1, d2, d3, d4) -> (string_of_eqn (SUBSET(d1,d2))) ^ " -> " ^ (string_of_eqn (SUBSET(d3, d4))) 
 and string_of_data : data -> string 
 = fun data -> match data with 
@@ -146,7 +146,7 @@ let rec string_of_eqns : eqn list -> string option
 
 let func_list = collect_func ex1
 let res = gen_equation ex1 func_list 
-let _ = string_of_eqns res 
+(* let _ = string_of_eqns res  *)
 
 (* AbsCache.t * AbsEnv.t are S in pdf *)
 (* l would be added in d2' in S *)
@@ -188,8 +188,13 @@ let rec solve : eqn list -> (AbsCache.t * AbsEnv.t) -> (AbsCache.t * AbsEnv.t)
   else solve lst s'
 
 let cfa : exp -> AbsCache.t * AbsEnv.t
-=fun exp -> solve exp (AbsCache.empty, AbsEnv.empty) 
+= fun exp -> 
+  let func_list = collect_func exp in 
+  let eqns = gen_equation exp func_list in 
+  solve eqns (AbsCache.empty, AbsEnv.empty) 
 
-let _ = cfa ex1 in 
-let _ = cfa ex2 in 
-let _ = cfa ex3
+let (cache1, env1) = cfa ex1  
+let (cache2, env2) = cfa ex2  
+let (cache3, env3) = cfa ex3  
+
+let _ = AbsCache.print cache1; AbsEnv.print env1
