@@ -64,7 +64,10 @@ module AbsCache = struct
         Map.iter (fun l terms ->
             print_endline (string_of_int l ^ " |-> " ^ string_of_terms terms)
         ) m
+    let union_f : label -> Terms.t -> Terms.t -> t -> t 
+    = fun x t1 t2 m -> Map.add x (Terms.union t1 t2) m
 end
+
 module Var = struct
     type t = string
     let compare = compare
@@ -80,6 +83,8 @@ module AbsEnv = struct
         Map.iter (fun x terms ->
             print_endline (x ^ " |-> " ^ string_of_terms terms)
         ) m
+    let union_f : string -> Terms.t -> Terms.t -> t -> t 
+    = fun x t1 t2 m -> Map.add x (Terms.union t1 t2) m
 end
 
 (* collecting functions to use in gen_equation.
@@ -152,10 +157,18 @@ let rec update : eqn list -> (AbsCache.t * AbsEnv.t) -> (AbsCache.t * AbsEnv.t)
       | SUBSET (d1, d2) -> if is_label d2 
         then let (C d2') = d2 in begin match d1 with 
         | T t -> let func   = get_func_name t in let cache' = AbsCache.add d2' func cache in update tl (cache', env) 
-        | C l -> let cache' = AbsCache.add d2' d1 cache in update tl (cache', env) (* need to change*)
-        | V s -> let cache' = AbsCache.add d2' s cache in update tl (cache', env) 
+        | C l -> let d1'    = AbsCache.find l cache in let d2'' = AbsCache.find d2' cache in  
+                 let cache' = AbsCache.union_f d2' d1' d2'' cache in update tl (cache', env) 
+        | V s -> let d1'    = AbsEnv.find s env in let d2'' = AbsCache.find d2' cache in  
+                 let cache' = AbsCache.union_f d2' d1' d2'' cache in update tl (cache', env) 
         end 
         else let (V d2') = d2 in begin match d1 with 
+        | T t -> let func = get_func_name t in let env' = AbsEnv.add d2' func env in update tl (cache, env') 
+        | C l -> let d1'  = AbsCache.find l cache in let d2'' = AbsEnv.find d2' env in  
+                 let env' = AbsEnv.union_f d2' d1' d2'' env in update tl (cache, env') 
+        | V s -> let d1'  = AbsEnv.find s env in let d2'' = AbsEnv.find d2' env in  
+                 let env' = AbsEnv.union_f d2' d1' d2'' env in update tl (cache, env') 
+        end 
       | COND (d1, d2, d3, d4) -> d 
   end
   | _ -> (cache, env)
