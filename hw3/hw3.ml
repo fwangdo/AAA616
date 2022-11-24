@@ -155,29 +155,34 @@ let rec update : eqn list -> (AbsCache.t * AbsEnv.t) -> (AbsCache.t * AbsEnv.t)
   | hd::tl -> 
     begin match hd with 
       | SUBSET (d1, d2) -> if is_label d2 
-        then let (C d2') = d2 in begin match d1 with 
-        | T t -> let func   = get_func_name t in let cache' = AbsCache.add d2' func cache in update tl (cache', env) 
+        then let d2' = get_l d2 in begin match d1 with 
+        | T t -> let t'     = Terms.add t Terms.empty in let cache' = AbsCache.add d2' t' cache in update tl (cache', env) 
         | C l -> let d1'    = AbsCache.find l cache in let d2'' = AbsCache.find d2' cache in  
                  let cache' = AbsCache.union_f d2' d1' d2'' cache in update tl (cache', env) 
         | V s -> let d1'    = AbsEnv.find s env in let d2'' = AbsCache.find d2' cache in  
                  let cache' = AbsCache.union_f d2' d1' d2'' cache in update tl (cache', env) 
         end 
-        else let (V d2') = d2 in begin match d1 with 
-        | T t -> let func = get_func_name t in let env' = AbsEnv.add d2' func env in update tl (cache, env') 
+        else let d2' = get_v d2 in begin match d1 with 
+        | T t -> let t'   = Terms.add t Terms.empty in let env' = AbsEnv.add d2' t' env in update tl (cache, env') 
         | C l -> let d1'  = AbsCache.find l cache in let d2'' = AbsEnv.find d2' env in  
                  let env' = AbsEnv.union_f d2' d1' d2'' env in update tl (cache, env') 
         | V s -> let d1'  = AbsEnv.find s env in let d2'' = AbsEnv.find d2' env in  
                  let env' = AbsEnv.union_f d2' d1' d2'' env in update tl (cache, env') 
         end 
-      | COND (d1, d2, d3, d4) -> d 
+      | COND (d1, d2, d3, d4) -> let d1' = get_term d1 in if is_label d2 
+        then let d2' = get_l d2 in let d2_term = AbsCache.find d2' cache in let res = Terms.find_opt d1' d2_term 
+             in if (Option.is_none res) then (cache, env) else let next = SUBSET(d3, d4) in update (next::tl) (cache, env) 
+        else let d2' = get_v d2 in let d2_term = AbsEnv.find d2' env in let res = Terms.find_opt d1' d2_term 
+             in if (Option.is_none res) then (cache, env) else let next = SUBSET(d3, d4) in update (next::tl) (cache, env) 
   end
   | _ -> (cache, env)
 and get_term      = function | T x -> x | C _ -> raise (Failure "Impossibe case in update")  | V _ -> raise (Failure "Impossibe case in update")
-and get_func_name = function | FN (s1, _) -> s1 | RECFN (s1, _, _) -> s1 | _ -> raise (Failure "Impossible case in get func name")
+and get_v         = function | V x -> x | T _ -> raise (Failure "Impossibe case in update")  | C _ -> raise (Failure "Impossibe case in update")
+and get_l         = function | C x -> x | T _ -> raise (Failure "Impossibe case in update")  | V _ -> raise (Failure "Impossibe case in update")
 and is_label      = function | C _ -> true | V _ -> false | T _ -> raise (Failure "Impossible case in is_label")
 
 let rec solve : eqn list -> (AbsCache.t * AbsEnv.t) -> (AbsCache.t * AbsEnv.t)
-= fun lst (cache, env) -> 
+= fun lst s -> let (cache, env) = s in 
   let s' = update lst s in let (cache', env') = s' in  
   if (AbsCache.order cache cache') && (AbsEnv.order env env') then s 
   else solve lst s'
