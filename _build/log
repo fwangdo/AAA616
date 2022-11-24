@@ -3,7 +3,7 @@
 # Shared cache: disabled
 # Workspace root: /home/hdy/AAA616-2022Fall
 # Auto-detected concurrency: 20
-$ /usr/bin/ocamlc.opt -config > /tmp/dune_f27585_output
+$ /usr/bin/ocamlc.opt -config > /tmp/dune_12d101_output
 # Dune context:
 #  { name = "default"
 #  ; kind = "default"
@@ -30,6 +30,8 @@ $ /usr/bin/ocamlc.opt -config > /tmp/dune_f27585_output
 #        ; "OCAMLPATH" : "/home/hdy/AAA616-2022Fall/_build/install/default/lib"
 #        ; "OCAMLTOP_INCLUDE_PATH" :
 #            "/home/hdy/AAA616-2022Fall/_build/install/default/lib/toplevel"
+#        ; "OCAML_COLOR" : "always"
+#        ; "OPAMCOLOR" : "always"
 #        }
 #  ; findlib_paths = [ External "/home/hdy/.opam/default/lib" ]
 #  ; arch_sixtyfour = true
@@ -147,15 +149,12 @@ $ /usr/bin/ocamlc.opt -config > /tmp/dune_f27585_output
 #      ; windows_unicode = false
 #      }
 #  }
-$ (cd _build/default && /usr/bin/ocamldep.opt -modules -impl hw1/interval.ml) > _build/default/hw1/.interval.eobjs/interval.ml.d
-$ (cd _build/default && /usr/bin/ocamlc.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -w -49 -nopervasives -nostdlib -g -bin-annot -I hw1/.interval.eobjs/byte -no-alias-deps -opaque -o hw1/.interval.eobjs/byte/dune__exe.cmo -c -impl hw1/.interval.eobjs/dune__exe.ml-gen)
 $ (cd _build/default && /usr/bin/ocamlc.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -w -66 -g -bin-annot -I hw3/.hw3.eobjs/byte -no-alias-deps -opaque -o hw3/.hw3.eobjs/byte/dune__exe__Hw3.cmo -c -impl hw3/hw3.ml)
-> File "hw3/hw3.ml", line 156, characters 8-11:
-> 156 |         end 
->               ^^^
+> File "hw3/hw3.ml", line 173, characters 16-18:
+> 173 | let _ = cfa ex1 in 
+>                       ^^
 > Error: Syntax error
 [2]
-$ (cd _build/default && /usr/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -w -49 -nopervasives -nostdlib -g -I hw1/.interval.eobjs/byte -I hw1/.interval.eobjs/native -intf-suffix .ml-gen -no-alias-deps -opaque -o hw1/.interval.eobjs/native/dune__exe.cmx -c -impl hw1/.interval.eobjs/dune__exe.ml-gen)
 $ (cd _build/default && /usr/bin/ocamlc.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -w -66 -g -bin-annot -I hw1/.interval.eobjs/byte -no-alias-deps -opaque -open Dune__exe -o hw1/.interval.eobjs/byte/dune__exe__Interval.cmo -c -impl hw1/interval.ml)
 > File "hw1/interval.ml", line 534, characters 16-20:
 > 534 |                 (**)

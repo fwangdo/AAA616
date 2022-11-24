@@ -98,7 +98,7 @@ let rec collect_func : exp -> term list
 let rec gen_equation : exp -> term list -> constraints
 = fun exp lst -> let term, label = exp in 
     match term with 
-    | CONST i            -> [] 
+    | CONST _            -> [] 
     | VAR   s            -> SUBSET(V(s), C(label))::[]
     | FN    (s1, e2)     -> let temp = gen_equation e2 lst in (SUBSET(T(term), C(label)))::temp 
     | RECFN (s1, s2, e3) -> let temp = gen_equation e3 lst in (SUBSET(T(term), C(label)))::(SUBSET(T(term), V(s1))::temp) 
@@ -126,7 +126,7 @@ and app_aux : exp -> exp -> label -> term list -> constraints
 (* Check intermediate result. *)
 let rec string_of_eqn : eqn -> string 
 = fun eqn -> match eqn with 
-  | SUBSET (d1, d2)         -> (string_of_data d1) ^ " =< " ^ (string_of_data d2) 
+  | SUBSET (d1, d2)         -> (string_of_data d1) ^ " (( " ^ (string_of_data d2) 
   | COND   (d1, d2, d3, d4) -> (string_of_eqn (SUBSET(d1,d2))) ^ " -> " ^ (string_of_eqn (SUBSET(d3, d4))) 
 and string_of_data : data -> string 
 = fun data -> match data with 
@@ -144,22 +144,24 @@ let res = gen_equation ex1 func_list
 let _ = string_of_eqns res 
 
 (* AbsCache.t * AbsEnv.t are S in pdf *)
-(* Think abou case where Union SUBSET SUBSET *)
+(* l would be added in d2' in S *)
 let rec update : eqn list -> (AbsCache.t * AbsEnv.t) -> (AbsCache.t * AbsEnv.t)
 = fun lst (cache, env) -> match lst with  
   | hd::tl -> 
     begin match hd with 
-      | SUBSET (d1, d2) -> let d2' = get_term d2 in  
-        begin match d1 with 
-        | C l -> let cache' = AbsCache.add l d2' cache in (cache', env)
-        | V s -> let env'   = AbsEnv.add s d2' env in (cache, env') 
-        | T t -> let func   = get_func_name t in let env' = AbsEnv.add func d2' env in (cache, env') 
+      | SUBSET (d1, d2) -> if is_label d2 
+        then let (C d2') = d2 in begin match d1 with 
+        | T t -> let func   = get_func_name t in let cache' = AbsCache.add d2' func cache in update tl (cache', env) 
+        | C l -> let cache' = AbsCache.add d2' d1 cache in update tl (cache', env) (* need to change*)
+        | V s -> let cache' = AbsCache.add d2' s cache in update tl (cache', env) 
         end 
-      | COND   (d1, d2, d3, d4) -> 
+        else let (V d2') = d2 in begin match d1 with 
+      | COND (d1, d2, d3, d4) -> d 
   end
   | _ -> (cache, env)
-and get_term      = function | T x -> x | C x -> raise (Failure "Impossibe case in update")  | V x -> raise (Failure "Impossibe case in update")
+and get_term      = function | T x -> x | C _ -> raise (Failure "Impossibe case in update")  | V _ -> raise (Failure "Impossibe case in update")
 and get_func_name = function | FN (s1, _) -> s1 | RECFN (s1, _, _) -> s1 | _ -> raise (Failure "Impossible case in get func name")
+and is_label      = function | C _ -> true | V _ -> false | T _ -> raise (Failure "Impossible case in is_label")
 
 let rec solve : eqn list -> (AbsCache.t * AbsEnv.t) -> (AbsCache.t * AbsEnv.t)
 = fun lst (cache, env) -> 
