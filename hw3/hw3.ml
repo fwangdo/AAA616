@@ -152,10 +152,9 @@ let res = gen_equation ex1 func_list
 (* l would be added in d2' in S *)
 let rec update : eqn list -> (AbsCache.t * AbsEnv.t) -> (AbsCache.t * AbsEnv.t)
 = fun lst (cache, env) -> match lst with  
-  | hd::tl -> 
-    begin match hd with 
+  | hd::tl -> begin match hd with 
       | SUBSET (d1, d2) -> if is_label d2 
-        then let d2' = get_l d2 in begin match d1 with 
+        then let d2' = get_l d2 in begin match d1 with  
         | T t -> let t'     = Terms.add t Terms.empty in let cache' = AbsCache.add d2' t' cache in update tl (cache', env) 
         | C l -> let d1'    = AbsCache.find l cache in let d2'' = AbsCache.find d2' cache in  
                  let cache' = AbsCache.union_f d2' d1' d2'' cache in update tl (cache', env) 
@@ -171,9 +170,9 @@ let rec update : eqn list -> (AbsCache.t * AbsEnv.t) -> (AbsCache.t * AbsEnv.t)
         end 
       | COND (d1, d2, d3, d4) -> let d1' = get_term d1 in if is_label d2 
         then let d2' = get_l d2 in let d2_term = AbsCache.find d2' cache in let res = Terms.find_opt d1' d2_term 
-             in if (Option.is_none res) then (cache, env) else let next = SUBSET(d3, d4) in update (next::tl) (cache, env) 
+             in if (Option.is_none res) then update tl (cache, env) else let next = SUBSET(d3, d4) in update (next::tl) (cache, env) 
         else let d2' = get_v d2 in let d2_term = AbsEnv.find d2' env in let res = Terms.find_opt d1' d2_term 
-             in if (Option.is_none res) then (cache, env) else let next = SUBSET(d3, d4) in update (next::tl) (cache, env) 
+             in if (Option.is_none res) then update tl (cache, env) else let next = SUBSET(d3, d4) in update (next::tl) (cache, env) 
   end
   | _ -> (cache, env)
 and get_term      = function | T x -> x | C _ -> raise (Failure "Impossibe case in update")  | V _ -> raise (Failure "Impossibe case in update")
@@ -182,9 +181,9 @@ and get_l         = function | C x -> x | T _ -> raise (Failure "Impossibe case 
 and is_label      = function | C _ -> true | V _ -> false | T _ -> raise (Failure "Impossible case in is_label")
 
 let rec solve : eqn list -> (AbsCache.t * AbsEnv.t) -> (AbsCache.t * AbsEnv.t)
-= fun lst s -> let (cache, env) = s in 
+= fun lst s -> let (cache, env) = s in  
   let s' = update lst s in let (cache', env') = s' in  
-  if (AbsCache.order cache cache') && (AbsEnv.order env env') then s 
+  if (AbsCache.order cache' cache) && (AbsEnv.order env' env) then s 
   else solve lst s'
 
 let cfa : exp -> AbsCache.t * AbsEnv.t
@@ -193,8 +192,8 @@ let cfa : exp -> AbsCache.t * AbsEnv.t
   let eqns = gen_equation exp func_list in 
   solve eqns (AbsCache.empty, AbsEnv.empty) 
 
-let (cache1, env1) = cfa ex1  
-let (cache2, env2) = cfa ex2  
-let (cache3, env3) = cfa ex3  
+let (cache1, env1) = cfa ex3 
+(* let (cache2, env2) = cfa ex2   *)
+(* let (cache3, env3) = cfa ex3   *)
 
 let _ = AbsCache.print cache1; AbsEnv.print env1
