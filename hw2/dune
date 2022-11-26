@@ -1,6 +1,6 @@
 (executables
  (names
- hw3
+ hw2
  )
  (libraries
   ))
