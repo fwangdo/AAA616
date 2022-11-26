@@ -203,5 +203,3 @@ let _ = AbsCache.print cache2; AbsEnv.print env2
 
 let _ = print_endline "\nProblem 3"
 let _ = AbsCache.print cache3; AbsEnv.print env3 
-(* let (cache2, env2) = cfa ex2   *)
-(* let (cache3, env3) = cfa ex3   *)
