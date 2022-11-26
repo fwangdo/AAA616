@@ -113,7 +113,7 @@ let rec gen_equation : exp -> term list -> constraints
                             let (_, l2) = e2 in let (_, l3) = e3 in let con1 = SUBSET(C(l2), C(label)) in let con2 = SUBSET(C(l3), C(label)) in 
                             con1::con2::(temp1@temp2@temp3)
     | LET   (s1, e2, e3) -> let temp1 = gen_equation e2 lst in let temp2 = gen_equation e3 lst in  
-                            let (_, l2) = e2 in let (_, l3) = e3 in let con1 = SUBSET(C(l2), V(s1)) in let con2 = SUBSET(C(l2), C(label)) in 
+                            let (_, l2) = e2 in let (_, l3) = e3 in let con1 = SUBSET(C(l2), V(s1)) in let con2 = SUBSET(C(l3), C(label)) in 
                             con1::con2::(temp1@temp2)
     | BOP   (o1, e2, e3) -> let temp1 = gen_equation e2 lst in let temp2 = gen_equation e3 lst in temp1@temp2 
 and app_aux : exp -> exp -> label -> term list -> constraints
@@ -122,7 +122,7 @@ and app_aux : exp -> exp -> label -> term list -> constraints
     | hd::tl -> begin match hd with 
         | FN(s1, (_, l0))       -> let temp1 = COND(T(hd), C(l1), C(l2), V(s1)) in
                                    let temp2 = COND(T(hd), C(l1), C(l0), C(l))  in temp1::temp2::(app_aux e1 e2 l tl) 
-        | RECFN(s1, _, (_, l0)) -> let temp1 = COND(T(hd), C(l1), C(l2), V(s1)) in 
+        | RECFN(_, s2, (_, l0)) -> let temp1 = COND(T(hd), C(l1), C(l2), V(s2)) in 
                                    let temp2 = COND(T(hd), C(l1), C(l0), C(l))  in temp1::temp2::(app_aux e1 e2 l tl)
         | _                     -> raise (Failure "undefined")
         end
@@ -192,8 +192,16 @@ let cfa : exp -> AbsCache.t * AbsEnv.t
   let eqns = gen_equation exp func_list in 
   solve eqns (AbsCache.empty, AbsEnv.empty) 
 
-let (cache1, env1) = cfa ex3 
+let (cache1, env1) = cfa ex1  
+let (cache2, env2) = cfa ex2 
+let (cache3, env3) = cfa ex3 
+let _ = print_endline "\nProblem 1"
+let _ = AbsCache.print cache1; AbsEnv.print env1 
+
+let _ = print_endline "\nProblem 2"
+let _ = AbsCache.print cache2; AbsEnv.print env2 
+
+let _ = print_endline "\nProblem 3"
+let _ = AbsCache.print cache3; AbsEnv.print env3 
 (* let (cache2, env2) = cfa ex2   *)
 (* let (cache3, env3) = cfa ex3   *)
-
-let _ = AbsCache.print cache1; AbsEnv.print env1
