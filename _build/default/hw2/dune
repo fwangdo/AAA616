@@ -1,0 +1,9 @@
+(executables
+ (names
+ hw2
+ )
+ (libraries
+  ))
+ (env
+  (dev
+    (flags (:standard -w -66))))

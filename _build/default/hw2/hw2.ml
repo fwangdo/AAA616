@@ -1,61 +1,48 @@
-type lv = 
-  | Var of string
-  | Ptr of string
-
-type exp = 
+type aexp = 
   | Const of int
-  | Plus of exp * exp
-  | Mult of exp * exp
-  | Sub of  exp * exp
-  | Lv of lv   (*  l-value *)
-  | Loc of lv  (* &l-value *)
+  | Var of string
+  | Plus of aexp * aexp
+  | Mult of aexp * aexp
+  | Sub of aexp * aexp
 
 type bexp = 
   | True 
   | False
-  | Equal of exp * exp
-  | Le of exp * exp
+  | Equal of aexp * aexp
+  | Le of aexp * aexp
   | Not of bexp
   | And of bexp * bexp
 
 type cmd = 
-  | Assign of lv * exp
-  | Alloc of lv
-  | Skip
+  | Assign of string * aexp
   | Seq of cmd list
   | If of bexp * cmd * cmd
   | While of bexp * cmd
 
-let rec string_of_lv : lv -> string 
-= fun l -> match l with
-  | Var s -> "Var " ^ s 
-  | Ptr s -> "Ptr " ^ s 
-
-let rec string_of_exp : exp -> string 
-= fun a -> match a with
+let rec string_of_aexp a = 
+  match a with
   | Const n -> string_of_int n
-  | Plus (a1, a2) -> string_of_exp a1 ^ " + " ^ string_of_exp a2
-  | Mult (a1, a2) -> string_of_exp a1 ^ " * " ^ string_of_exp a2
-  | Sub (a1, a2)  -> string_of_exp a1 ^ " - " ^ string_of_exp a2
-  | Lv  lv        -> string_of_lv lv
-  | Loc lv        -> string_of_lv lv
+  | Var x -> x
+  | Plus (a1, a2) -> string_of_aexp a1 ^ " + " ^ string_of_aexp a2
+  | Mult (a1, a2) -> string_of_aexp a1 ^ " * " ^ string_of_aexp a2
+  | Sub (a1, a2) -> string_of_aexp a1 ^ " - " ^ string_of_aexp a2
 
 and string_of_bexp b = 
   match b with
   | True -> "true" 
   | False -> "false"
-  | Equal (a1, a2) -> string_of_exp a1 ^ " == " ^ string_of_exp a2
-  | Le (a1, a2) -> string_of_exp a1 ^ " <= " ^ string_of_exp a2
+  | Equal (a1, a2) -> string_of_aexp a1 ^ " == " ^ string_of_aexp a2
+  | Le (a1, a2) -> string_of_aexp a1 ^ " <= " ^ string_of_aexp a2
   | Not b -> "!(" ^ string_of_bexp b ^ ")"
   | And (b1, b2) -> string_of_bexp b1 ^ " && " ^ string_of_bexp b2
 
 module type Node = sig
   type instr = 
-  | I_assign of string * exp 
+  | I_assign of string * aexp 
   | I_assume of bexp 
   | I_skip
   type t = int * instr 
-  val create_assign : string -> exp -> t 
+  val create_assign : string -> aexp -> t 
   val create_assume : bexp -> t 
   val create_skip : unit -> t 
   val get_nodeid : t -> int 
@@ -66,7 +53,7 @@ end
 
 module Node : Node = struct
   type instr = 
-  | I_assign of string * exp 
+  | I_assign of string * aexp 
   | I_assume of bexp 
   | I_skip
   type t = int * instr
@@ -82,7 +69,7 @@ module Node : Node = struct
   let to_string n = 
     match n with
     | (id, I_assign (x, a)) -> 
-      string_of_int id ^ ": " ^ " " ^ x ^ " := " ^ string_of_exp a
+      string_of_int id ^ ": " ^ " " ^ x ^ " := " ^ string_of_aexp a
     | (id, I_assume b) -> 
       string_of_int id ^ ": " ^ "assume"  ^ " " ^ string_of_bexp b
     | (id, I_skip) -> 
