@@ -1,6 +1,6 @@
 type lv = 
   | Var of string
-  | Ptr of string
+  | Ptr of lv 
 
 type exp = 
   | Const of int
@@ -19,8 +19,8 @@ type bexp =
   | And of bexp * bexp
 
 type cmd = 
-  | Assign of lv * exp
-  | Alloc of lv
+  | Assign of exp * exp
+  | Alloc of exp 
   | Skip
   | Seq of cmd list
   | If of bexp * cmd * cmd
@@ -29,7 +29,7 @@ type cmd =
 let rec string_of_lv : lv -> string 
 = fun l -> match l with
   | Var s -> "Var " ^ s 
-  | Ptr s -> "Ptr " ^ s 
+  | Ptr s -> "Ptr " ^ (string_of_lv s) 
 
 let rec string_of_exp : exp -> string 
 = fun a -> match a with
@@ -899,18 +899,31 @@ let analyze : Cfg.t -> Table.t
   res_of_narrow
 
 
-let pgm = 
+let pgm1 = 
   Seq [
-    Assign ("x", Const 0); 
-    Assign ("y", Const 0);
-    While (Le (Var "x", Const 9), 
-      Seq [
-        Assign ("x", Plus (Var "x", Const 1)); 
-        Assign ("y", Plus (Var "y", Const 1)); 
-      ]);
+    Assign (Lv(Var "x"), Const 1); 
+    Assign (Lv(Var "p"), Loc (Var "x"));
+    Assign (Lv(Ptr (Var "p")), Plus (Lv(Ptr (Var "p")), Const 1))
   ]
 
-let cfg = cmd2cfg pgm
+let pgm2 = 
+  Seq [
+    Alloc (Lv(Var "p")); 
+    Assign (Lv(Var "q"), Loc(Var "p"));
+    Assign (Lv(Ptr (Ptr (Var "q"))), Const 1)
+  ]
+
+let pgm3 = 
+  Seq [
+    Assign (Lv(Var "x"), Const 1); 
+    While (Le (Lv(Var "x"), Const 9), 
+      Seq [
+        Alloc (Lv(Var "p"));
+        Assign (Lv(Ptr(Var "p")), Plus (Lv(Ptr(Var "p")), Const 1)); 
+        Assign (Lv(Var "x"), Plus (Lv(Var "x"), Const 1)); 
+      ]);
+  ]
+let cfg = cmd2cfg pgm1
 let _ = Cfg.print cfg
 let _ = Cfg.dot cfg
 let table = analyze cfg 
