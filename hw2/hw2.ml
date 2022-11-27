@@ -21,10 +21,10 @@ type bexp =
 type cmd = 
   | Assign of exp * exp
   | Alloc of exp 
-  | Skip
   | Seq of cmd list
   | If of bexp * cmd * cmd
   | While of bexp * cmd
+  | Skip
 
 let rec string_of_lv : lv -> string 
 = fun l -> match l with
@@ -36,27 +36,29 @@ let rec string_of_exp : exp -> string
   | Const n -> string_of_int n
   | Plus (a1, a2) -> string_of_exp a1 ^ " + " ^ string_of_exp a2
   | Mult (a1, a2) -> string_of_exp a1 ^ " * " ^ string_of_exp a2
-  | Sub (a1, a2)  -> string_of_exp a1 ^ " - " ^ string_of_exp a2
-  | Lv  lv        -> string_of_lv lv
-  | Loc lv        -> string_of_lv lv
+  | Sub  (a1, a2) -> string_of_exp a1 ^ " - " ^ string_of_exp a2
+  | Lv   lv       -> string_of_lv lv
+  | Loc  lv       -> string_of_lv lv
 
 and string_of_bexp b = 
   match b with
-  | True -> "true" 
-  | False -> "false"
+  | True           -> "true" 
+  | False          -> "false"
   | Equal (a1, a2) -> string_of_exp a1 ^ " == " ^ string_of_exp a2
-  | Le (a1, a2) -> string_of_exp a1 ^ " <= " ^ string_of_exp a2
-  | Not b -> "!(" ^ string_of_bexp b ^ ")"
-  | And (b1, b2) -> string_of_bexp b1 ^ " && " ^ string_of_bexp b2
+  | Le    (a1, a2) -> string_of_exp a1 ^ " <= " ^ string_of_exp a2
+  | Not b          -> "!(" ^ string_of_bexp b ^ ")"
+  | And   (b1, b2) -> string_of_bexp b1 ^ " && " ^ string_of_bexp b2
 
 module type Node = sig
   type instr = 
   | I_assign of string * exp 
   | I_assume of bexp 
+  | I_alloc of lv
   | I_skip
   type t = int * instr 
   val create_assign : string -> exp -> t 
   val create_assume : bexp -> t 
+  val create_alloc : lv -> t 
   val create_skip : unit -> t 
   val get_nodeid : t -> int 
   val get_instr : t -> instr 
@@ -68,6 +70,7 @@ module Node : Node = struct
   type instr = 
   | I_assign of string * exp 
   | I_assume of bexp 
+  | I_alloc of lv  
   | I_skip
   type t = int * instr
   let new_id : unit -> int =
@@ -75,6 +78,7 @@ module Node : Node = struct
       fun _ -> (id := !id + 1; !id)
   let create_assign x a = (new_id(), I_assign (x, a))
   let create_assume b = (new_id(), I_assume b)
+  let create_alloc l = (new_id(), I_alloc l)
   let create_skip () = (new_id(), I_skip)
   let get_nodeid (id, _) = id
   let get_instr (_, instr) = instr
@@ -85,6 +89,8 @@ module Node : Node = struct
       string_of_int id ^ ": " ^ " " ^ x ^ " := " ^ string_of_exp a
     | (id, I_assume b) -> 
       string_of_int id ^ ": " ^ "assume"  ^ " " ^ string_of_bexp b
+    | (id, I_alloc lv) ->
+      string_of_int id ^ ": " ^ string_of_lv lv ^ "alloc" 
     | (id, I_skip) -> 
       string_of_int id ^ ": " ^ "skip"
 end
@@ -193,12 +199,12 @@ let take_pgm : cmd -> cmd list
 
 let rec seperate_bool : bexp -> Node.t -> Node.t list -> Cfg.t -> (Node.t * Node.t list * Cfg.t)
 = fun bexp sp lst cfg -> match bexp with 
-  | True -> let suss = (Node.create_assume bexp) in (suss, lst, (Cfg.add_edge sp suss cfg))  
-  | False -> let fail = (Node.create_assume bexp) in (fail, lst, (Cfg.add_edge sp fail cfg)) 
+  | True           -> let suss = (Node.create_assume bexp) in (suss, lst, (Cfg.add_edge sp suss cfg))  
+  | False          -> let fail = (Node.create_assume bexp) in (fail, lst, (Cfg.add_edge sp fail cfg)) 
   | Equal (a1, a2) -> let suss = Node.create_assume bexp in let fail = Node.create_assume (Not bexp) in (suss ,fail::lst, (Cfg.add_edge sp suss cfg))
-  | Le (a1, a2) -> let suss = Node.create_assume bexp in let fail = Node.create_assume (Not bexp) in (suss, fail::lst, (Cfg.add_edge sp suss cfg))
-  | Not b1 -> let suss = Node.create_assume bexp in let fail = Node.create_assume (Not bexp) in (suss, fail::lst, (Cfg.add_edge sp suss cfg))
-  | And (b1, b2) -> let (suss, lst1, cfg1) = seperate_bool b1 sp lst cfg in let (suss', lst2, cfg2) = seperate_bool b2 suss lst1 cfg1 in (suss', lst2, cfg2) 
+  | Le    (a1, a2) -> let suss = Node.create_assume bexp in let fail = Node.create_assume (Not bexp) in (suss, fail::lst, (Cfg.add_edge sp suss cfg))
+  | Not   b1       -> let suss = Node.create_assume bexp in let fail = Node.create_assume (Not bexp) in (suss, fail::lst, (Cfg.add_edge sp suss cfg))
+  | And   (b1, b2) -> let (suss, lst1, cfg1) = seperate_bool b1 sp lst cfg in let (suss', lst2, cfg2) = seperate_bool b2 suss lst1 cfg1 in (suss', lst2, cfg2) 
 
 let rec cmd2cfg : cmd -> Cfg.t 
 = fun cmd -> let init = Cfg.empty in 
