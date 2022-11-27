@@ -19,8 +19,8 @@ type bexp =
   | And of bexp * bexp
 
 type cmd = 
-  | Assign of exp * exp
-  | Alloc of exp 
+  | Assign of lv * exp
+  | Alloc of lv 
   | Seq of cmd list
   | If of bexp * cmd * cmd
   | While of bexp * cmd
@@ -196,6 +196,10 @@ end
 
 let take_pgm : cmd -> cmd list 
 = function | Seq(lst) -> lst | _ -> (raise (Failure "Impossible case"))
+
+(* Additional functiosn to get name in setting of hw2 *)
+
+(* done *)
 
 let rec seperate_bool : bexp -> Node.t -> Node.t list -> Cfg.t -> (Node.t * Node.t list * Cfg.t)
 = fun bexp sp lst cfg -> match bexp with 
@@ -907,26 +911,26 @@ let analyze : Cfg.t -> Table.t
 
 let pgm1 = 
   Seq [
-    Assign (Lv(Var "x"), Const 1); 
-    Assign (Lv(Var "p"), Loc (Var "x"));
-    Assign (Lv(Ptr (Var "p")), Plus (Lv(Ptr (Var "p")), Const 1))
+    Assign ((Var "x"), Const 1); 
+    Assign ((Var "p"), Loc (Var "x"));
+    Assign ((Ptr (Var "p")), Plus (Lv(Ptr (Var "p")), Const 1))
   ]
 
 let pgm2 = 
   Seq [
     Alloc (Lv(Var "p")); 
-    Assign (Lv(Var "q"), Loc(Var "p"));
-    Assign (Lv(Ptr (Ptr (Var "q"))), Const 1)
+    Assign ((Var "q"), Loc(Var "p"));
+    Assign ((Ptr (Ptr (Var "q"))), Const 1)
   ]
 
 let pgm3 = 
   Seq [
-    Assign (Lv(Var "x"), Const 1); 
+    Assign ((Var "x"), Const 1); 
     While (Le (Lv(Var "x"), Const 9), 
       Seq [
-        Alloc (Lv(Var "p"));
-        Assign (Lv(Ptr(Var "p")), Plus (Lv(Ptr(Var "p")), Const 1)); 
-        Assign (Lv(Var "x"), Plus (Lv(Var "x"), Const 1)); 
+        Alloc ((Var "p"));
+        Assign ((Ptr(Var "p")), Plus (Lv(Ptr(Var "p")), Const 1)); 
+        Assign ((Var "x"), Plus (Lv(Var "x"), Const 1)); 
       ]);
   ]
 let cfg = cmd2cfg pgm1
