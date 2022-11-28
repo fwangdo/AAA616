@@ -51,12 +51,12 @@ and string_of_bexp b =
 
 module type Node = sig
   type instr = 
-  | I_assign of string * exp 
+  | I_assign of lv * exp 
   | I_assume of bexp 
   | I_alloc of lv
   | I_skip
   type t = int * instr 
-  val create_assign : string -> exp -> t 
+  val create_assign : lv -> exp -> t 
   val create_assume : bexp -> t 
   val create_alloc : lv -> t 
   val create_skip : unit -> t 
@@ -68,7 +68,7 @@ end
 
 module Node : Node = struct
   type instr = 
-  | I_assign of string * exp 
+  | I_assign of lv * exp 
   | I_assume of bexp 
   | I_alloc of lv  
   | I_skip
@@ -86,7 +86,7 @@ module Node : Node = struct
   let to_string n = 
     match n with
     | (id, I_assign (x, a)) -> 
-      string_of_int id ^ ": " ^ " " ^ x ^ " := " ^ string_of_exp a
+      string_of_int id ^ ": " ^ " " ^ string_of_lv x ^ " := " ^ string_of_exp a
     | (id, I_assume b) -> 
       string_of_int id ^ ": " ^ "assume"  ^ " " ^ string_of_bexp b
     | (id, I_alloc lv) ->
@@ -198,7 +198,8 @@ let take_pgm : cmd -> cmd list
 = function | Seq(lst) -> lst | _ -> (raise (Failure "Impossible case"))
 
 (* Additional functiosn to get name in setting of hw2 *)
-
+(* let get_var_name : lv -> string  *)
+(* = function | Var x -> x | Ptr  *)
 (* done *)
 
 let rec seperate_bool : bexp -> Node.t -> Node.t list -> Cfg.t -> (Node.t * Node.t list * Cfg.t)
@@ -218,6 +219,7 @@ and parsing : cmd list -> Cfg.t -> Node.t -> Node.t -> Node.t -> bool -> Cfg.t
 = fun smt cfg lp ep pr loop -> match smt with
  | hd::tl -> begin match hd with 
     | Assign (s1, a2)      -> let cur = Node.create_assign s1 a2 in Cfg.add_edge pr cur (parsing tl cfg lp ep cur loop)
+    | Alloc  (lv)          -> let cur = Node.create_alloc lv in Cfg.add_edge pr cur (parsing tl cfg lp ep cur loop)
     | Seq    (l1)          -> let sp' = Node.create_skip() in let ep' = Node.create_skip() in  
                               let cfg' = Cfg.add_edge pr sp' cfg in 
                               if loop then parsing l1 cfg' lp ep' sp' loop 
@@ -238,6 +240,7 @@ and parsing : cmd list -> Cfg.t -> Node.t -> Node.t -> Node.t -> bool -> Cfg.t
                               let cfg''' = Cfg.add_edge sp' npass cfg'' in
                               let cfg'''' = (parsing tl cfg''' lp ep' npass loop) in 
                               if loop then cfg'''' else Cfg.add_edge ep' ep cfg'''' (* connect 10 to 5 *) 
+    | Skip                 -> let cur = Node.create_skip() in Cfg.add_edge pr cur (parsing tl cfg lp ep cur loop)
   end
   | _ -> let cfg' = Cfg.add_edge pr ep cfg in if loop then Cfg.add_edge ep lp cfg' else cfg'
 (****)
@@ -266,9 +269,30 @@ module AbsBool : AbsBool = struct
     | True, True -> True (* it is the other case.*)
 end
 
+(* Added in hw2*)
+module type AbsLoc = sig 
+  type t = 
+    | Var of string 
+    | Allsite of int (* the number of node *) 
+
+  val to_string : t -> string 
+end
+
+(* TODO *)
+module AbsLoc : AbsLoc = struct 
+  type t = 
+    | Var of string 
+    | Allsite of int (* the number of node *) 
+
+  let to_string : t -> string 
+  = fun a -> match a with 
+    | Var s     -> "Var " ^ s 
+    | Allsite i -> "Allsite " ^ string_of_int i 
+end
+
 module type Interval = sig
   type atom = Con of int | N_inf | P_inf
-  type t = Bot | Top | Iv of atom * atom  
+  type t    = Bot | Top | Iv of atom * atom  
   val bottom : t
   val to_string : t -> string
   val alpha : int -> t 
@@ -511,9 +535,13 @@ module Interval : Interval = struct
         if intersection a b then AbsBool.Top else AbsBool.False  (* b1 is less than a2 without intersection. it means whole range of b is less then range of a. *)
 end
 
+module Value = struct
+  type t = | AbsLoc | Interval
+end
+
 module VarMap = Map.Make(String)
 module type AbsMem = sig
-  type t = Interval.t VarMap.t 
+  type t = Value.t VarMap.t 
   val empty : t
   val add : string -> Interval.t -> t -> t
   val find : string -> t -> Interval.t 
@@ -525,9 +553,10 @@ module type AbsMem = sig
   val print : t -> unit 
 end
 
+
 (* this one is for caculation while executing commands with absmem *)
 module AbsMem : AbsMem = struct
-  type t = Interval.t VarMap.t 
+  type t = Value.t VarMap.t 
 
   let print m = VarMap.iter (fun x v -> prerr_endline 
     (x ^ " |-> " ^ Interval.to_string v)) m 
@@ -664,11 +693,10 @@ let rec execute : Node.instr -> AbsMem.t -> AbsMem.t
   | I_skip -> mem  
   | I_assign (s1, a2) ->  let a2' = execute_aexp a2 mem in 
                           let n_mem = VarMap.update s1 (update_option a2') mem in n_mem 
-  (* CFG should be separated into several conditions when bool expression's' are in condition of while.*)
-  (* We assume a situation where we have a very well seperate cfg. so handle a case where it has just a one bool exp. *)
   | I_assume b -> execute_bexp b mem false  
+  (* need to add I_alloc *)
 (* we need to caculate values of aexp but value in vars are abstracted *)
-and execute_aexp : aexp -> AbsMem.t -> Interval.t 
+and execute_aexp : exp -> AbsMem.t -> Interval.t 
 = fun exp mem -> match exp with 
   | Const i -> Interval.alpha i 
   | Var s -> AbsMem.find s mem 
@@ -727,7 +755,7 @@ and update_mem : bexp -> AbsMem.t -> AbsMem.t
                       if ((left@right) |> List.length) = 0 then mem else
                       (let rcd = composition left a1 a2 true false mem mem in composition right a1 a2 false false mem rcd)
   | _ -> mem
-and update_aux : (aexp * Interval.t * bool) -> isEqual:bool -> mem:AbsMem.t -> (string * Interval.t) 
+and update_aux : (exp * Interval.t * bool) -> isEqual:bool -> mem:AbsMem.t -> (string * Interval.t) 
 = fun (var, iv, isLeft) ~isEqual ~mem -> let name = (function | Var s -> s | _ -> raise (Failure "Error in name")) var in 
   if isEqual then (let temp = eq_aux name iv mem in (name, temp)) 
   else (let temp = le_aux name iv isLeft mem in (name, temp))   
