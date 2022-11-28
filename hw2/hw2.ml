@@ -270,18 +270,32 @@ module AbsBool : AbsBool = struct
 end
 
 (* Added in hw2*)
-module type AbsLoc = sig 
-  type atom = 
+module BaseLoc = struct
+  type t = 
     | Bot
     | Top
     | Var of string 
     | Allsite of int (* the number of node *) 
 
-  type t = atom list 
+  let compare : t -> t -> int 
+  = compare
 
-  val string_of_atom : atom -> string
+  let to_string : t -> string 
+  = fun a -> match a with 
+    | Bot       -> "Bot in location"
+    | Top       -> "Top in location"
+    | Var s     -> "Var " ^ s 
+    | Allsite i -> "Allsite " ^ string_of_int i 
+end
+
+module type AbsLoc = sig
+  type t = BaseLoc.t list 
+
+  val compare : 'a -> 'a -> int
+
+  val string_of_atom : BaseLoc.t -> string
   val to_string : t -> string -> string 
-  val bottom : atom 
+  val bottom : BaseLoc.t 
 
   val order : t -> t -> bool 
   val join : t -> t -> t
@@ -292,14 +306,10 @@ end
 
 (* TODO *)
 module AbsLoc : AbsLoc = struct 
-  type atom = 
-    | Bot
-    | Top
-    | Var of string 
-    | Allsite of int (* the number of node *) 
+  type t = BaseLoc.t list
 
-  type t = atom list
-  let string_of_atom : atom -> string 
+  let compare = compare
+  let string_of_atom : BaseLoc.t -> string 
   = fun a -> match a with 
     | Bot       -> "Bot in location"
     | Top       -> "Top in location"
@@ -310,7 +320,7 @@ module AbsLoc : AbsLoc = struct
   = fun lst str -> match lst with 
     | hd::tl -> let str' = str ^ ", " ^ string_of_atom hd in to_string tl str' 
     | _      -> str
-  let bottom = Bot
+  let bottom = BaseLoc.Bot
 
   let rec order l1 l2 = match l1 with 
     | hd::tl -> if (List.mem hd l2) then order tl l2 else false 
@@ -328,7 +338,7 @@ end
 
 module type Interval = sig
   type atom = Con of int | N_inf | P_inf
-  type t    = Bot | Top | Iv of atom * atom  
+  type t    = Bot | Top | Iv of atom * atom | Var of string | Allsite of int    
   val bottom : t
   val to_string : t -> string
   val alpha : int -> t 
@@ -351,7 +361,7 @@ end
 module Interval : Interval = struct
   type atom = Con of int | N_inf | P_inf
   (* N_inf means negative infinite, P_int means postiive negative.*)
-  type t = Bot | Top | Iv of atom * atom  
+  type t = Bot | Top | Iv of atom * atom | Var of string | Allsite of int 
 
   let bottom = Bot 
 
@@ -363,9 +373,11 @@ module Interval : Interval = struct
 
   let to_string : t -> string 
   = fun i -> match i with 
-    | Bot -> "Bottom" 
-    | Top -> "Top"
+    | Bot        -> "Bottom" 
+    | Top        -> "Top"
     | Iv(i1, i2) -> let str_i1 = string_of_atom i1 in let str_i2 = string_of_atom i2 in "[" ^ str_i1 ^ ", " ^ str_i2 ^ "]"
+    | Var s      -> "Var " ^ s 
+    | Allsite i  -> "AllocSite " ^ string_of_int i 
 
   (* I guess this function is for abstracting concrete values. *)
   let alpha : int -> t 
@@ -401,6 +413,7 @@ module Interval : Interval = struct
     | Top, _ -> false  
     (* interval cases. thinks about inf cases frist!*)
     | Iv(a1, a2), Iv(b1, b2) -> if (comp b1 a1) && (comp a2 b2) then true else false 
+    | _ -> raise (Failure "undefined")
 
   (* okay *)
   let join a b = match a, b with
@@ -414,7 +427,8 @@ module Interval : Interval = struct
                                 else if (comp b1 a1) && (comp a2 b2) then Iv(b1, b2)
                                 else if (comp b1 a1) && (comp b2 a2) then Iv(b1, a2)
                                 else raise (Failure "Error: Impossible case in join")
-   
+    | _ -> raise (Failure "undefined")
+
   (* okay *)
   let meet a b = match (a, b) with  
     | Bot, _ -> Bot
@@ -426,6 +440,7 @@ module Interval : Interval = struct
                                             else if (comp b1 a1) && (comp a2 b2) then Iv(a1, a2) (* this case is in situation where a is included in b.*)
                                             else if (comp b1 a1) && (comp b2 a2) then if comp a1 b2 then Iv(a1, b2) else Bot (* intersection case *)
                                             else raise (Failure "Error: Impossible case in meet")
+    | _ -> raise (Failure "undefined")
  
   (* this will be executed on x (widen) f(x). *)
   let widen a b = match (a, b) with  
@@ -436,6 +451,7 @@ module Interval : Interval = struct
     | Iv(a1, a2), Iv(b1, b2) -> let new_a = if (comp a1 b1) then a1 else N_inf in 
                                 let new_b = if (comp b2 a2) then a2 else P_inf in 
                                 Iv(new_a, new_b)
+    | _ -> raise (Failure "undefined")
  
   let narrow a b = match (a, b) with 
     | Bot, _ -> Bot 
@@ -445,6 +461,7 @@ module Interval : Interval = struct
     | Iv(a1, a2), Iv(b1, b2) -> let new_a = if (a1 = N_inf) then b1 else a1 in 
                                 let new_b = if (a2 = P_inf) then b2 else a2 in 
                                 Iv(new_a, new_b)
+    | _ -> raise (Failure "undefined")
  
   (* okay *)
   let add a b = match (a, b) with 
@@ -466,6 +483,7 @@ module Interval : Interval = struct
         | _, P_inf -> P_inf
         | Con a2', Con b2' -> Con (a2' + b2')) in 
         Iv(new_a, new_b) 
+    | _ -> raise (Failure "undefined")
 
   (* okay *)
   let sub a b = match (a, b) with 
@@ -487,6 +505,7 @@ module Interval : Interval = struct
         | _, N_inf -> P_inf
         | Con a2', Con b2' -> Con (a2' - b2')) in 
         Iv(new_a, new_b) 
+    | _ -> raise (Failure "undefined")
 
   (* in this part, we should consider order between new_a and new_b *)
   (*
@@ -509,6 +528,7 @@ module Interval : Interval = struct
                                             let c1 = List.fold_right interval_min candidate t1 in 
                                             let c2 = List.fold_right interval_max candidate t1 in
                                             Iv(c1, c2)
+    | _ -> raise (Failure "undefined")
   and mul_aux : atom -> atom -> atom 
   = fun a b -> match a, b with 
     | P_inf, z' | z', P_inf -> (match z' with
@@ -560,6 +580,7 @@ module Interval : Interval = struct
     | Iv(a1, a2), Iv(b1, b2) -> 
       if comp a2 b1 then AbsBool.True else (* this one includes a2 == b1 case.*)
         if intersection a b then AbsBool.Top else AbsBool.False  (* b1 is less than a2 without intersection. it means whole range of b is less then range of a. *)
+    | _ -> raise (Failure "undefined")
 
   let ge a b = match (a,b) with   
     | Bot, _ -> AbsBool.Bot
@@ -569,16 +590,17 @@ module Interval : Interval = struct
     | Iv(a1, a2), Iv(b1, b2) -> 
       if comp b2 a1 then AbsBool.True else (* this one includes a2 == b1 case.*)
         if intersection a b then AbsBool.Top else AbsBool.False  (* b1 is less than a2 without intersection. it means whole range of b is less then range of a. *)
+    | _ -> raise (Failure "undefined")
 end
 
 
-module VarMap = Map.Make(String)
+module VarMap = Map.Make(BaseLoc)
 module type AbsMem = sig
   type value = (AbsLoc.t * Interval.t)
   type t     = (AbsLoc.t * Interval.t) VarMap.t 
   val empty : t
-  val add : string -> value -> t -> t
-  val find : string -> t -> value 
+  val add : BaseLoc.t -> value -> t -> t
+  val find : BaseLoc.t -> t -> value 
   val join : t -> t -> t 
   val meet : t -> t -> t 
   val widen : t -> t -> t 
@@ -593,7 +615,7 @@ module AbsMem : AbsMem = struct
   type t     = value VarMap.t 
 
   let print m = VarMap.iter (fun x (l, v) -> prerr_endline 
-    (x ^ " |-> " ^ (AbsLoc.to_string l "") ^ " | " ^ (Interval.to_string v))) m 
+    (BaseLoc.to_string x ^ " |-> " ^ (AbsLoc.to_string l "") ^ " | " ^ (Interval.to_string v))) m 
 
   let empty = VarMap.empty
 
@@ -603,31 +625,24 @@ module AbsMem : AbsMem = struct
 
   let keys b = List.fold_right (fun (k,v) lst -> k::lst) b []
 
-  let debug : string list -> string -> string 
+  (* let debug : BaseLoc.t list -> BaseLoc.t -> BaseLoc.t 
   = fun lst s -> match lst with 
     | hd::_ -> s ^ hd  
-    | _ -> s
+    | _ -> s *)
 
-  let rec union_keys : string list -> string list -> string list 
+  let rec union_keys : BaseLoc.t list -> BaseLoc.t list -> BaseLoc.t list 
   = fun a b -> match b with 
     | hd::tl -> if List.mem hd a then union_keys a tl else union_keys (hd::a) tl 
     | [] -> a 
 
-  let rec calc : (value -> value -> value) -> t -> t -> string list -> t -> t
+  let rec calc : (value -> value -> value) -> t -> t -> BaseLoc.t list -> t -> t
   = fun f m1 m2 keys m3 -> match keys with
     | hd::tl -> let m2_val = find hd m2 in let m1_val = find hd m1 in 
                 let m3' = add hd (f m1_val m2_val) m3 in
                 calc f m1 m2 tl m3'
     | _ -> m3 
-  (* and calc_interval : (Interval.t -> Interval.t -> Interval.t) -> t -> t -> string list -> t -> t
-  = fun f m1 m2 keys m3 -> match keys with
-    | hd::tl -> let (m2_loc, m2_iv) = find hd m2 in let (m1_loc, m1_iv) = find hd m1 in 
-                let (m3_loc, m3_iv) = find hd m3 in  
-                let m3' = add hd (f m1_iv m2_iv) m3 in
-                calc f m1 m2 tl m3'
-    | _ -> m3 *)
 
-  let rec calc_bool : (value -> value -> bool) -> t -> t -> string list -> bool 
+  let rec calc_bool : (value -> value -> bool) -> t -> t -> BaseLoc.t list -> bool 
   = fun f m1 m2 keys -> match keys with
     | hd::tl -> let m2_val = find hd m2 in let m1_val = find hd m1 in 
                 if (f m1_val m2_val) then calc_bool f m1 m2 tl else false   
@@ -695,7 +710,6 @@ module AbsMem : AbsMem = struct
     = fun a b -> let (a_loc, a_itv) = a in let (b_loc, b_itv) = b in 
     let a' = AbsLoc.order a_loc b_loc in let b' = Interval.order a_itv b_itv in 
     if (a' = true) && (b' = true) then true else false 
-
 end
 
 module type Table = sig
@@ -735,25 +749,52 @@ let handle_le : Interval.t -> int -> bool -> Interval.t
   | Interval.Top -> if ord then Interval.Iv(Interval.N_inf, (Interval.Con i)) else Interval.Iv((Interval.Con i), Interval.P_inf)
   | Interval.Iv(i1, i2) -> if ord then (if (Interval.comp ip i1) then Interval.Bot else (if (Interval.comp i2 im) then iv else Interval.Iv(i1, ii))) 
                                   else (if (Interval.comp i2 im) then Interval.Bot else (if (Interval.comp ip i1) then iv else Interval.Iv(ii, i2)))
+    | _ -> raise (Failure "undefined")
 
-let update_option a = function | None -> Some a | Some x -> Some a  
-                      
-(* it needs to consider a case where r-value has variables.*)
-let rec execute : Node.instr -> AbsMem.t -> AbsMem.t
-= fun cmd mem -> match cmd with 
-  | I_skip -> mem  
-  | I_assign (s1, a2) ->  let a2' = execute_aexp a2 mem in 
-                          let n_mem = VarMap.update s1 (update_option a2') mem in n_mem 
+let update_option a = function | None -> Some a | Some _ -> Some a  
+
+(* check location or arithmetic value *)
+let check_location : Interval.t -> bool (* return true when it is location*) 
+= fun va -> match va with 
+  | Bot -> true   
+  | Top -> true
+  | Iv (a1, a2) -> false 
+  | Var s -> true 
+  | Allsite i -> true 
+
+
+(* int is the number of node. *)
+let rec execute : int -> Node.instr -> AbsMem.t -> AbsMem.t
+= fun idx cmd mem -> match cmd with 
+  | I_assign (Var s , a2) ->  let s'  = BaseLoc.Var s in 
+                              let a2' = execute_exp a2 mem in 
+                              let loc', mem' = AbsMem.find s' mem in
+                              if check_location a2' 
+                              then VarMap.update (BaseLoc.Var s) (update_option ([a2'], Interval.Bot)) mem 
+                              else ([AbsLoc.Bottom], a2')
+  | I_skip     -> mem  
   | I_assume b -> execute_bexp b mem false  
+  | I_alloc l  -> (* 1. Add new allocsite in l, 2. Add 0 in new location. *) 
+                  let zero     = Interval.alpha 0 in 
+                  let addr     = Interval.Allsite idx in 
+                  let mem'     = VarMap.update addr (update_option zero) mem in 
+                  (* let (loc', _) = mem' in  *)
+                  begin match l with 
+                    | Var s -> VarMap.update l (update_option addr) mem' 
+                    | Ptr p -> execute idx (I_alloc p) mem  
+                    end
   (* need to add I_alloc *)
 (* we need to caculate values of aexp but value in vars are abstracted *)
-and execute_aexp : exp -> AbsMem.t -> Interval.t 
+and execute_exp : exp -> AbsMem.t -> Interval.t 
 = fun exp mem -> match exp with 
-  | Const i -> Interval.alpha i 
-  | Var s -> AbsMem.find s mem 
+  | Const i       -> Interval.alpha i 
+  | Var   s       -> AbsMem.find s mem 
   | Plus (a1, a2) -> Interval.add (execute_aexp a1 mem) (execute_aexp a2 mem)
   | Mult (a1, a2) -> Interval.mul (execute_aexp a1 mem) (execute_aexp a2 mem)
   | Sub  (a1, a2) -> Interval.sub (execute_aexp a1 mem) (execute_aexp a2 mem)
+  | Lv   (Ptr p)  -> execute_exp (Lv p) mem
+  | Lv   (Var s)  -> AbsMem.find (Var s) mem
+  | Loc  lv       -> AbsMem.find lv mem 
 (* this one will return memory itself.*)
 and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
 = fun exp mem not -> match exp with (* n_not means the number of not *) 
@@ -841,19 +882,19 @@ and le_aux : string -> Interval.t -> bool -> AbsMem.t -> Interval.t
                               let new_a = if (Interval.comp a1 b1) then b1 else a1 in 
                               let new_b = b2 in Iv(new_a, new_b)))
 (* this func composes trans_aux with inter_execute *)
-and composition : aexp list -> aexp -> aexp -> bool -> bool -> AbsMem.t -> AbsMem.t -> AbsMem.t 
+and composition : exp list -> exp -> exp -> bool -> bool -> AbsMem.t -> AbsMem.t -> AbsMem.t 
 = fun lst left right isLeft isEqual mem rcd -> match lst with (* rcd means record. *) 
   | hd::tl -> let (name, iv) = (trans_aux hd left right isLeft) |> (inter_execute ~mem:mem) |> (update_aux ~isEqual:isEqual ~mem:mem) in 
               let rcd' = VarMap.update name (update_option iv) rcd in composition tl left right isLeft isEqual mem rcd'
   | _      -> rcd 
 (*right should be calculated more. then, need to applied to execute_aexp. *)
-and inter_execute : (aexp * aexp * bool) -> mem:AbsMem.t -> (aexp * Interval.t * bool)
+and inter_execute : (exp * exp * bool) -> mem:AbsMem.t -> (exp * Interval.t * bool)
 = fun (left, right, isLeft) ~mem -> let va = execute_aexp right mem in match left, right with (* left is the one should be updated. *) 
   | Var s, _ -> (Var s, va, isLeft)  
   | Mult (Var s, Const z), _ -> let divided = div_aux va z in (Var s, divided, isLeft)
   | Mult (Const z, Var s), _ -> let divided = div_aux va z in (Var s, divided, isLeft)
   | _ -> raise (Failure "Error in inter execute: Impossible case.")
-and trans_aux : aexp -> aexp -> aexp -> bool -> (aexp * aexp * bool) (* example of output, 2(x + z) = 4y + 8z => x = 2y + 6z. *)
+and trans_aux : exp -> exp -> exp -> bool -> (exp * exp * bool) (* example of output, 2(x + z) = 4y + 8z => x = 2y + 6z. *)
 = fun var left right isLeft -> let name = (function | Var s -> s | _ -> raise (Failure "Error in name")) var in (* if isLeft is true, then position of var is left. otherwise, vars is located in right of exp. *)
   (* print_endline ("Var: " ^ name ^ "," ^ "Left: " ^ (string_of_aexp left) ^ "," ^ "Right: " ^ (string_of_aexp right)); *)
   (if isLeft 
@@ -873,21 +914,21 @@ and trans_aux : aexp -> aexp -> aexp -> bool -> (aexp * aexp * bool) (* example 
   | Sub  (a1, a2) -> if find_aux var a1 then let new_left = Plus (left, a2) in trans_aux var new_left a1 isLeft else let new_left = Sub (left, a1) in trans_aux var (Mult (a2, Const (-1))) (Mult (new_left, Const (-1))) true (* important *) 
   | Mult (a1, a2) -> if find_aux var a1 then trans_aux var left (mult_aux a1 a2) isLeft else trans_aux var left (mult_aux a2 a1) isLeft
   | _ -> raise (Failure "Error in trans_aux: Const found"))) 
-and mult_aux : aexp -> aexp -> aexp (* multipled -> multiplying -> result *)
+and mult_aux : exp -> exp -> exp (* multipled -> multiplying -> result *)
 = fun obj sub -> match obj with 
   | Const i       -> Mult (obj, sub) 
   | Var   s       -> Mult (obj, sub) 
   | Plus (a1, a2) -> Plus ((Mult (a1, sub)), (Mult (a2, sub))) 
   | Mult (a1, a2) -> Mult ((Mult (a1, sub)), (Mult (a2, sub))) 
   | Sub  (a1, a2) -> Sub ((Mult (a1, sub)), (Mult (a2, sub))) 
-and find_aux : aexp -> aexp -> bool 
+and find_aux : exp -> exp -> bool 
 = fun var aexp -> let name = (function | Var s -> s | _ -> raise (Failure "Error in name")) var in match aexp with 
   | Const i       -> false 
   | Var   s       -> if name = s then true else false  
   | Plus (a1, a2) -> (find_aux var a1) || (find_aux var a2)
   | Mult (a1, a2) -> (find_aux var a1) || (find_aux var a2)
   | Sub  (a1, a2) -> (find_aux var a1) || (find_aux var a2)
-and find_var : aexp -> aexp list -> aexp list (* will give you the vars with position(e.g. left, right.)*) 
+and find_var : exp -> exp list -> exp list (* will give you the vars with position(e.g. left, right.)*) 
 = fun aexp lst -> match aexp with 
   | Const i       -> lst 
   | Var   s       -> aexp::lst 
