@@ -1,49 +1,64 @@
-type aexp = 
-  | Const of int
+type lv = 
   | Var of string
-  | Plus of aexp * aexp
-  | Mult of aexp * aexp
-  | Sub of aexp * aexp
+  | Ptr of lv 
+
+type exp = 
+  | Const of int
+  | Plus of exp * exp
+  | Mult of exp * exp
+  | Sub of  exp * exp
+  | Lv of lv   (*  l-value *)
+  | Loc of lv  (* &l-value *)
 
 type bexp = 
   | True 
   | False
-  | Equal of aexp * aexp
-  | Le of aexp * aexp
+  | Equal of exp * exp
+  | Le of exp * exp
   | Not of bexp
   | And of bexp * bexp
 
 type cmd = 
-  | Assign of string * aexp
+  | Assign of lv * exp
+  | Alloc of lv 
   | Seq of cmd list
   | If of bexp * cmd * cmd
   | While of bexp * cmd
+  | Skip
 
-let rec string_of_aexp a = 
-  match a with
+let rec string_of_lv : lv -> string 
+= fun l -> match l with
+  | Var s -> "Var " ^ s 
+  | Ptr s -> "Ptr " ^ (string_of_lv s) 
+
+let rec string_of_exp : exp -> string 
+= fun a -> match a with
   | Const n -> string_of_int n
-  | Var x -> x
-  | Plus (a1, a2) -> string_of_aexp a1 ^ " + " ^ string_of_aexp a2
-  | Mult (a1, a2) -> string_of_aexp a1 ^ " * " ^ string_of_aexp a2
-  | Sub (a1, a2) -> string_of_aexp a1 ^ " - " ^ string_of_aexp a2
+  | Plus (a1, a2) -> string_of_exp a1 ^ " + " ^ string_of_exp a2
+  | Mult (a1, a2) -> string_of_exp a1 ^ " * " ^ string_of_exp a2
+  | Sub  (a1, a2) -> string_of_exp a1 ^ " - " ^ string_of_exp a2
+  | Lv   lv       -> string_of_lv lv
+  | Loc  lv       -> string_of_lv lv
 
 and string_of_bexp b = 
   match b with
-  | True -> "true" 
-  | False -> "false"
-  | Equal (a1, a2) -> string_of_aexp a1 ^ " == " ^ string_of_aexp a2
-  | Le (a1, a2) -> string_of_aexp a1 ^ " <= " ^ string_of_aexp a2
-  | Not b -> "!(" ^ string_of_bexp b ^ ")"
-  | And (b1, b2) -> string_of_bexp b1 ^ " && " ^ string_of_bexp b2
+  | True           -> "true" 
+  | False          -> "false"
+  | Equal (a1, a2) -> string_of_exp a1 ^ " == " ^ string_of_exp a2
+  | Le    (a1, a2) -> string_of_exp a1 ^ " <= " ^ string_of_exp a2
+  | Not b          -> "!(" ^ string_of_bexp b ^ ")"
+  | And   (b1, b2) -> string_of_bexp b1 ^ " && " ^ string_of_bexp b2
 
 module type Node = sig
   type instr = 
-  | I_assign of string * aexp 
+  | I_assign of lv * exp 
   | I_assume of bexp 
+  | I_alloc of lv
   | I_skip
   type t = int * instr 
-  val create_assign : string -> aexp -> t 
+  val create_assign : lv -> exp -> t 
   val create_assume : bexp -> t 
+  val create_alloc : lv -> t 
   val create_skip : unit -> t 
   val get_nodeid : t -> int 
   val get_instr : t -> instr 
@@ -53,8 +68,9 @@ end
 
 module Node : Node = struct
   type instr = 
-  | I_assign of string * aexp 
+  | I_assign of lv * exp 
   | I_assume of bexp 
+  | I_alloc of lv  
   | I_skip
   type t = int * instr
   let new_id : unit -> int =
@@ -62,6 +78,7 @@ module Node : Node = struct
       fun _ -> (id := !id + 1; !id)
   let create_assign x a = (new_id(), I_assign (x, a))
   let create_assume b = (new_id(), I_assume b)
+  let create_alloc l = (new_id(), I_alloc l)
   let create_skip () = (new_id(), I_skip)
   let get_nodeid (id, _) = id
   let get_instr (_, instr) = instr
@@ -69,9 +86,11 @@ module Node : Node = struct
   let to_string n = 
     match n with
     | (id, I_assign (x, a)) -> 
-      string_of_int id ^ ": " ^ " " ^ x ^ " := " ^ string_of_aexp a
+      string_of_int id ^ ": " ^ " " ^ string_of_lv x ^ " := " ^ string_of_exp a
     | (id, I_assume b) -> 
       string_of_int id ^ ": " ^ "assume"  ^ " " ^ string_of_bexp b
+    | (id, I_alloc lv) ->
+      string_of_int id ^ ": " ^ string_of_lv lv ^ "alloc" 
     | (id, I_skip) -> 
       string_of_int id ^ ": " ^ "skip"
 end
@@ -178,14 +197,19 @@ end
 let take_pgm : cmd -> cmd list 
 = function | Seq(lst) -> lst | _ -> (raise (Failure "Impossible case"))
 
+(* Additional functiosn to get name in setting of hw2 *)
+(* let get_var_name : lv -> string  *)
+(* = function | Var x -> x | Ptr  *)
+(* done *)
+
 let rec seperate_bool : bexp -> Node.t -> Node.t list -> Cfg.t -> (Node.t * Node.t list * Cfg.t)
 = fun bexp sp lst cfg -> match bexp with 
-  | True -> let suss = (Node.create_assume bexp) in (suss, lst, (Cfg.add_edge sp suss cfg))  
-  | False -> let fail = (Node.create_assume bexp) in (fail, lst, (Cfg.add_edge sp fail cfg)) 
+  | True           -> let suss = (Node.create_assume bexp) in (suss, lst, (Cfg.add_edge sp suss cfg))  
+  | False          -> let fail = (Node.create_assume bexp) in (fail, lst, (Cfg.add_edge sp fail cfg)) 
   | Equal (a1, a2) -> let suss = Node.create_assume bexp in let fail = Node.create_assume (Not bexp) in (suss ,fail::lst, (Cfg.add_edge sp suss cfg))
-  | Le (a1, a2) -> let suss = Node.create_assume bexp in let fail = Node.create_assume (Not bexp) in (suss, fail::lst, (Cfg.add_edge sp suss cfg))
-  | Not b1 -> let suss = Node.create_assume bexp in let fail = Node.create_assume (Not bexp) in (suss, fail::lst, (Cfg.add_edge sp suss cfg))
-  | And (b1, b2) -> let (suss, lst1, cfg1) = seperate_bool b1 sp lst cfg in let (suss', lst2, cfg2) = seperate_bool b2 suss lst1 cfg1 in (suss', lst2, cfg2) 
+  | Le    (a1, a2) -> let suss = Node.create_assume bexp in let fail = Node.create_assume (Not bexp) in (suss, fail::lst, (Cfg.add_edge sp suss cfg))
+  | Not   b1       -> let suss = Node.create_assume bexp in let fail = Node.create_assume (Not bexp) in (suss, fail::lst, (Cfg.add_edge sp suss cfg))
+  | And   (b1, b2) -> let (suss, lst1, cfg1) = seperate_bool b1 sp lst cfg in let (suss', lst2, cfg2) = seperate_bool b2 suss lst1 cfg1 in (suss', lst2, cfg2) 
 
 let rec cmd2cfg : cmd -> Cfg.t 
 = fun cmd -> let init = Cfg.empty in 
@@ -195,6 +219,7 @@ and parsing : cmd list -> Cfg.t -> Node.t -> Node.t -> Node.t -> bool -> Cfg.t
 = fun smt cfg lp ep pr loop -> match smt with
  | hd::tl -> begin match hd with 
     | Assign (s1, a2)      -> let cur = Node.create_assign s1 a2 in Cfg.add_edge pr cur (parsing tl cfg lp ep cur loop)
+    | Alloc  (lv)          -> let cur = Node.create_alloc lv in Cfg.add_edge pr cur (parsing tl cfg lp ep cur loop)
     | Seq    (l1)          -> let sp' = Node.create_skip() in let ep' = Node.create_skip() in  
                               let cfg' = Cfg.add_edge pr sp' cfg in 
                               if loop then parsing l1 cfg' lp ep' sp' loop 
@@ -215,6 +240,7 @@ and parsing : cmd list -> Cfg.t -> Node.t -> Node.t -> Node.t -> bool -> Cfg.t
                               let cfg''' = Cfg.add_edge sp' npass cfg'' in
                               let cfg'''' = (parsing tl cfg''' lp ep' npass loop) in 
                               if loop then cfg'''' else Cfg.add_edge ep' ep cfg'''' (* connect 10 to 5 *) 
+    | Skip                 -> let cur = Node.create_skip() in Cfg.add_edge pr cur (parsing tl cfg lp ep cur loop)
   end
   | _ -> let cfg' = Cfg.add_edge pr ep cfg in if loop then Cfg.add_edge ep lp cfg' else cfg'
 (****)
@@ -243,9 +269,37 @@ module AbsBool : AbsBool = struct
     | True, True -> True (* it is the other case.*)
 end
 
+(* Added in hw2*)
+module type AbsLoc = sig 
+  type t = 
+    | Bot
+    | Var of string 
+    | Allsite of int (* the number of node *) 
+
+  val to_string : t -> string 
+
+  val bottom : unit -> t 
+end
+
+(* TODO *)
+module AbsLoc : AbsLoc = struct 
+  type t = 
+    | Bot
+    | Var of string 
+    | Allsite of int (* the number of node *) 
+
+  let to_string : t -> string 
+  = fun a -> match a with 
+    | Bot       -> "Bot in location"
+    | Var s     -> "Var " ^ s 
+    | Allsite i -> "Allsite " ^ string_of_int i 
+
+  let bottom () = Bot
+end
+
 module type Interval = sig
   type atom = Con of int | N_inf | P_inf
-  type t = Bot | Top | Iv of atom * atom  
+  type t    = Bot | Top | Iv of atom * atom  
   val bottom : t
   val to_string : t -> string
   val alpha : int -> t 
@@ -488,12 +542,14 @@ module Interval : Interval = struct
         if intersection a b then AbsBool.Top else AbsBool.False  (* b1 is less than a2 without intersection. it means whole range of b is less then range of a. *)
 end
 
+
 module VarMap = Map.Make(String)
 module type AbsMem = sig
-  type t = Interval.t VarMap.t 
+  type temp = (AbsLoc.t * Interval.t)
+  type t    = (AbsLoc.t * Interval.t) VarMap.t 
   val empty : t
-  val add : string -> Interval.t -> t -> t
-  val find : string -> t -> Interval.t 
+  val add : string -> temp -> t -> t
+  val find : string -> t -> temp 
   val join : t -> t -> t 
   val meet : t -> t -> t 
   val widen : t -> t -> t 
@@ -504,14 +560,15 @@ end
 
 (* this one is for caculation while executing commands with absmem *)
 module AbsMem : AbsMem = struct
-  type t = Interval.t VarMap.t 
+  type temp = (AbsLoc.t * Interval.t)
+  type t    = (AbsLoc.t * Interval.t) VarMap.t 
 
-  let print m = VarMap.iter (fun x v -> prerr_endline 
-    (x ^ " |-> " ^ Interval.to_string v)) m 
+  let print m = VarMap.iter (fun x (l, v) -> prerr_endline 
+    (x ^ " |-> " ^ (AbsLoc.to_string l) ^ " | " ^ (Interval.to_string v))) m 
 
   let empty = VarMap.empty
 
-  let find x m = try VarMap.find x m with _ -> Interval.bottom 
+  let find x m = try VarMap.find x m with _ -> (AbsLoc.bottom, Interval.bottom) 
 
   let add x v m = VarMap.add x v m  
 
@@ -527,20 +584,14 @@ module AbsMem : AbsMem = struct
     | hd::tl -> if List.mem hd a then union_keys a tl else union_keys (hd::a) tl 
     | [] -> a 
 
-  let rec calc : (Interval.t -> Interval.t -> Interval.t) -> t -> t -> string list -> t -> t
+  let rec calc : (Value.t -> Value.t -> Value.t) -> t -> t -> string list -> t -> t
   = fun f m1 m2 keys m3 -> match keys with
     | hd::tl -> let m2_val = find hd m2 in let m1_val = find hd m1 in 
                 let m3' = add hd (f m1_val m2_val) m3 in
-                (**)
-                (* let _ = print_endline ("[AbsMem m1,m2]" ^ (Interval.to_string m1_val) ^ (Interval.to_string m1_val)) in
-                let _ = print_endline "[AbsMem keys]"; print_endline hd in
-                let _ = print_endline "[AbsMem join]"; let s_m3 = Interval.to_string (f m1_val m2_val) in print_endline (s_m3) in 
-                let _ = print_endline "[AbsMem widen]"; print m3' in  *)
-                (**)
                 calc f m1 m2 tl m3'
     | _ -> m3
 
-  let rec calc_bool : (Interval.t -> Interval.t -> bool) -> t -> t -> string list -> bool 
+  let rec calc_bool : (Value.t -> Value.t -> bool) -> t -> t -> string list -> bool 
   = fun f m1 m2 keys -> match keys with
     | hd::tl -> let m2_val = find hd m2 in let m1_val = find hd m1 in 
                 if (f m1_val m2_val) then calc_bool f m1 m2 tl else false   
@@ -641,11 +692,10 @@ let rec execute : Node.instr -> AbsMem.t -> AbsMem.t
   | I_skip -> mem  
   | I_assign (s1, a2) ->  let a2' = execute_aexp a2 mem in 
                           let n_mem = VarMap.update s1 (update_option a2') mem in n_mem 
-  (* CFG should be separated into several conditions when bool expression's' are in condition of while.*)
-  (* We assume a situation where we have a very well seperate cfg. so handle a case where it has just a one bool exp. *)
   | I_assume b -> execute_bexp b mem false  
+  (* need to add I_alloc *)
 (* we need to caculate values of aexp but value in vars are abstracted *)
-and execute_aexp : aexp -> AbsMem.t -> Interval.t 
+and execute_aexp : exp -> AbsMem.t -> Interval.t 
 = fun exp mem -> match exp with 
   | Const i -> Interval.alpha i 
   | Var s -> AbsMem.find s mem 
@@ -704,7 +754,7 @@ and update_mem : bexp -> AbsMem.t -> AbsMem.t
                       if ((left@right) |> List.length) = 0 then mem else
                       (let rcd = composition left a1 a2 true false mem mem in composition right a1 a2 false false mem rcd)
   | _ -> mem
-and update_aux : (aexp * Interval.t * bool) -> isEqual:bool -> mem:AbsMem.t -> (string * Interval.t) 
+and update_aux : (exp * Interval.t * bool) -> isEqual:bool -> mem:AbsMem.t -> (string * Interval.t) 
 = fun (var, iv, isLeft) ~isEqual ~mem -> let name = (function | Var s -> s | _ -> raise (Failure "Error in name")) var in 
   if isEqual then (let temp = eq_aux name iv mem in (name, temp)) 
   else (let temp = le_aux name iv isLeft mem in (name, temp))   
@@ -886,18 +936,31 @@ let analyze : Cfg.t -> Table.t
   res_of_narrow
 
 
-let pgm = 
+let pgm1 = 
   Seq [
-    Assign ("x", Const 0); 
-    Assign ("y", Const 0);
-    While (Le (Var "x", Const 9), 
-      Seq [
-        Assign ("x", Plus (Var "x", Const 1)); 
-        Assign ("y", Plus (Var "y", Const 1)); 
-      ]);
+    Assign ((Var "x"), Const 1); 
+    Assign ((Var "p"), Loc (Var "x"));
+    Assign ((Ptr (Var "p")), Plus (Lv(Ptr (Var "p")), Const 1))
   ]
 
-let cfg = cmd2cfg pgm
+let pgm2 = 
+  Seq [
+    Alloc (Lv(Var "p")); 
+    Assign ((Var "q"), Loc(Var "p"));
+    Assign ((Ptr (Ptr (Var "q"))), Const 1)
+  ]
+
+let pgm3 = 
+  Seq [
+    Assign ((Var "x"), Const 1); 
+    While (Le (Lv(Var "x"), Const 9), 
+      Seq [
+        Alloc ((Var "p"));
+        Assign ((Ptr(Var "p")), Plus (Lv(Ptr(Var "p")), Const 1)); 
+        Assign ((Var "x"), Plus (Lv(Var "x"), Const 1)); 
+      ]);
+  ]
+let cfg = cmd2cfg pgm1
 let _ = Cfg.print cfg
 let _ = Cfg.dot cfg
 let table = analyze cfg 

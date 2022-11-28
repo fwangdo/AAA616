@@ -3,7 +3,7 @@
 # Shared cache: disabled
 # Workspace root: /home/hdy/AAA616-2022Fall
 # Auto-detected concurrency: 20
-$ /usr/bin/ocamlc.opt -config > /tmp/dune_1fcc15_output
+$ /usr/bin/ocamlc.opt -config > /tmp/dune_45d384_output
 # Dune context:
 #  { name = "default"
 #  ; kind = "default"
@@ -149,184 +149,232 @@ $ /usr/bin/ocamlc.opt -config > /tmp/dune_1fcc15_output
 #      ; windows_unicode = false
 #      }
 #  }
+$ (cd _build/default && /usr/bin/ocamlc.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -w -66 -g -bin-annot -I hw3/.hw3.eobjs/byte -no-alias-deps -opaque -o hw3/.hw3.eobjs/byte/dune__exe__Hw3.cmo -c -impl hw3/hw3.ml)
+> File "hw3/hw3.ml", line 108, characters 13-15:
+> 108 |     | FN    (s1, e2)     -> let temp = gen_equation e2 lst in (SUBSET(T(term), C(label)))::temp 
+>                    ^^
+> Error (warning 27 [unused-var-strict]): unused variable s1.
+> File "hw3/hw3.ml", line 109, characters 17-19:
+> 109 |     | RECFN (s1, s2, e3) -> let temp = gen_equation e3 lst in (SUBSET(T(term), C(label)))::(SUBSET(T(term), V(s1))::temp) 
+>                        ^^
+> Error (warning 27 [unused-var-strict]): unused variable s2.
+> File "hw3/hw3.ml", line 118, characters 13-15:
+> 118 |     | BOP   (o1, e2, e3) -> let temp1 = gen_equation e2 lst in let temp2 = gen_equation e3 lst in temp1@temp2 
+>                    ^^
+> Error (warning 27 [unused-var-strict]): unused variable o1.
+[2]
 $ (cd _build/default && /usr/bin/ocamlc.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -w -66 -g -bin-annot -I hw2/.hw2.eobjs/byte -no-alias-deps -opaque -o hw2/.hw2.eobjs/byte/dune__exe__Hw2.cmo -c -impl hw2/hw2.ml)
-> File "hw2/hw2.ml", line 534, characters 16-20:
+> File "hw2/hw2.ml", line 888, characters 14-18:
+> 888 |               (**)
+>                     ^^^^
+> Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)
+> File "hw2/hw2.ml", line 891, characters 14-18:
+> 891 |               (**)
+>                     ^^^^
+> Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)
+> File "hw2/hw2.ml", line 896, characters 14-18:
+> 896 |               (**)
+>                     ^^^^
+> Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)
+> File "hw2/hw2.ml", line 899, characters 14-18:
+> 899 |               (**)
+>                     ^^^^
+> Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)
+> File "hw2/hw2.ml", line 917, characters 14-18:
+> 917 |               (**)
+>                     ^^^^
+> Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)
+> File "hw2/hw2.ml", line 922, characters 14-18:
+> 922 |               (**)
+>                     ^^^^
+> Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)
+> File "hw2/hw2.ml", line 497, characters 10-39:
+> 497 |   let rec intersection : t -> t -> bool
+>                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> Error (warning 39 [unused-rec-flag]): unused rec flag.
+> File "hw2/hw2.ml", line 587, characters 18-25:
+> 587 |   let rec calc : (Value.t -> Value.t -> Value.t) -> t -> t -> string list -> t -> t
+>                         ^^^^^^^
+> Error: Unbound module Value
+[2]
+$ (cd _build/default && /usr/bin/ocamlc.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -w -66 -g -bin-annot -I hw1/.interval.eobjs/byte -no-alias-deps -opaque -open Dune__exe -o hw1/.interval.eobjs/byte/dune__exe__Interval.cmo -c -impl hw1/interval.ml)
+> File "hw1/interval.ml", line 534, characters 16-20:
 > 534 |                 (**)
 >                       ^^^^
 > Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)
-> File "hw2/hw2.ml", line 539, characters 16-20:
+> File "hw1/interval.ml", line 539, characters 16-20:
 > 539 |                 (**)
 >                       ^^^^
 > Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)
-> File "hw2/hw2.ml", line 838, characters 14-18:
+> File "hw1/interval.ml", line 838, characters 14-18:
 > 838 |               (**)
 >                     ^^^^
 > Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)
-> File "hw2/hw2.ml", line 841, characters 14-18:
+> File "hw1/interval.ml", line 841, characters 14-18:
 > 841 |               (**)
 >                     ^^^^
 > Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)
-> File "hw2/hw2.ml", line 846, characters 14-18:
+> File "hw1/interval.ml", line 846, characters 14-18:
 > 846 |               (**)
 >                     ^^^^
 > Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)
-> File "hw2/hw2.ml", line 849, characters 14-18:
+> File "hw1/interval.ml", line 849, characters 14-18:
 > 849 |               (**)
 >                     ^^^^
 > Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)
-> File "hw2/hw2.ml", line 867, characters 14-18:
+> File "hw1/interval.ml", line 867, characters 14-18:
 > 867 |               (**)
 >                     ^^^^
 > Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)
-> File "hw2/hw2.ml", line 872, characters 14-18:
+> File "hw1/interval.ml", line 872, characters 14-18:
 > 872 |               (**)
 >                     ^^^^
 > Error (warning 50 [unexpected-docstring]): unattached documentation comment (ignored)
-> File "hw2/hw2.ml", line 443, characters 10-39:
+> File "hw1/interval.ml", line 443, characters 10-39:
 > 443 |   let rec intersection : t -> t -> bool
 >                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 > Error (warning 39 [unused-rec-flag]): unused rec flag.
-> File "hw2/hw2.ml", line 587, characters 10-15:
+> File "hw1/interval.ml", line 587, characters 10-15:
 > 587 |   let rec order m1 m2 = 
 >                 ^^^^^
 > Error (warning 39 [unused-rec-flag]): unused rec flag.
-> File "hw2/hw2.ml", line 185, characters 11-13:
+> File "hw1/interval.ml", line 185, characters 11-13:
 > 185 |   | Equal (a1, a2) -> let suss = Node.create_assume bexp in let fail = Node.create_assume (Not bexp) in (suss ,fail::lst, (Cfg.add_edge sp suss cfg))
 >                  ^^
 > Error (warning 27 [unused-var-strict]): unused variable a1.
-> File "hw2/hw2.ml", line 185, characters 15-17:
+> File "hw1/interval.ml", line 185, characters 15-17:
 > 185 |   | Equal (a1, a2) -> let suss = Node.create_assume bexp in let fail = Node.create_assume (Not bexp) in (suss ,fail::lst, (Cfg.add_edge sp suss cfg))
 >                      ^^
 > Error (warning 27 [unused-var-strict]): unused variable a2.
-> File "hw2/hw2.ml", line 186, characters 8-10:
+> File "hw1/interval.ml", line 186, characters 8-10:
 > 186 |   | Le (a1, a2) -> let suss = Node.create_assume bexp in let fail = Node.create_assume (Not bexp) in (suss, fail::lst, (Cfg.add_edge sp suss cfg))
 >               ^^
 > Error (warning 27 [unused-var-strict]): unused variable a1.
-> File "hw2/hw2.ml", line 186, characters 12-14:
+> File "hw1/interval.ml", line 186, characters 12-14:
 > 186 |   | Le (a1, a2) -> let suss = Node.create_assume bexp in let fail = Node.create_assume (Not bexp) in (suss, fail::lst, (Cfg.add_edge sp suss cfg))
 >                   ^^
 > Error (warning 27 [unused-var-strict]): unused variable a2.
-> File "hw2/hw2.ml", line 187, characters 8-10:
+> File "hw1/interval.ml", line 187, characters 8-10:
 > 187 |   | Not b1 -> let suss = Node.create_assume bexp in let fail = Node.create_assume (Not bexp) in (suss, fail::lst, (Cfg.add_edge sp suss cfg))
 >               ^^
 > Error (warning 27 [unused-var-strict]): unused variable b1.
-> File "hw2/hw2.ml", line 477, characters 9-11:
+> File "hw1/interval.ml", line 477, characters 9-11:
 > 477 |     | Iv(a1, a2), Iv(b1, b2) -> 
 >                ^^
 > Error (warning 27 [unused-var-strict]): unused variable a1.
-> File "hw2/hw2.ml", line 477, characters 25-27:
+> File "hw1/interval.ml", line 477, characters 25-27:
 > 477 |     | Iv(a1, a2), Iv(b1, b2) -> 
 >                                ^^
 > Error (warning 27 [unused-var-strict]): unused variable b2.
-> File "hw2/hw2.ml", line 486, characters 13-15:
+> File "hw1/interval.ml", line 486, characters 13-15:
 > 486 |     | Iv(a1, a2), Iv(b1, b2) -> 
 >                    ^^
 > Error (warning 27 [unused-var-strict]): unused variable a2.
-> File "hw2/hw2.ml", line 486, characters 21-23:
+> File "hw1/interval.ml", line 486, characters 21-23:
 > 486 |     | Iv(a1, a2), Iv(b1, b2) -> 
 >                            ^^
 > Error (warning 27 [unused-var-strict]): unused variable b1.
-> File "hw2/hw2.ml", line 518, characters 39-40:
+> File "hw1/interval.ml", line 518, characters 39-40:
 > 518 |   let keys b = List.fold_right (fun (k,v) lst -> k::lst) b []
 >                                              ^
 > Error (warning 27 [unused-var-strict]): unused variable v.
-> File "hw2/hw2.ml", line 520, characters 6-11:
+> File "hw1/interval.ml", line 520, characters 6-11:
 > 520 |   let debug : string list -> string -> string 
 >             ^^^^^
 > Error (warning 32 [unused-value-declaration]): unused value debug.
-> File "hw2/hw2.ml", line 522, characters 10-12:
+> File "hw1/interval.ml", line 522, characters 10-12:
 > 522 |     | hd::tl -> s ^ hd 
 >                 ^^
 > Error (warning 27 [unused-var-strict]): unused variable tl.
-> File "hw2/hw2.ml", line 636, characters 55-56:
+> File "hw1/interval.ml", line 636, characters 55-56:
 > 636 | let update_option a = function | None -> Some a | Some x -> Some a  
 >                                                              ^
 > Error (warning 27 [unused-var-strict]): unused variable x.
-> File "hw2/hw2.ml", line 662, characters 30-31:
+> File "hw1/interval.ml", line 662, characters 30-31:
 > 662 |                       | Const n, Var s -> execute_bexp (Equal(a2, a1)) mem not 
 >                                     ^
 > Error (warning 27 [unused-var-strict]): unused variable n.
-> File "hw2/hw2.ml", line 662, characters 37-38:
+> File "hw1/interval.ml", line 662, characters 37-38:
 > 662 |                       | Const n, Var s -> execute_bexp (Equal(a2, a1)) mem not 
 >                                            ^
 > Error (warning 27 [unused-var-strict]): unused variable s.
-> File "hw2/hw2.ml", line 683, characters 30-32:
+> File "hw1/interval.ml", line 683, characters 30-32:
 > 683 |                       | Const n1, Const n2 -> mem (* bottom? or normal execution? *)
 >                                     ^^
 > Error (warning 27 [unused-var-strict]): unused variable n1.
-> File "hw2/hw2.ml", line 683, characters 40-42:
+> File "hw1/interval.ml", line 683, characters 40-42:
 > 683 |                       | Const n1, Const n2 -> mem (* bottom? or normal execution? *)
 >                                               ^^
 > Error (warning 27 [unused-var-strict]): unused variable n2.
-> File "hw2/hw2.ml", line 726, characters 14-15:
+> File "hw1/interval.ml", line 726, characters 14-15:
 > 726 |     | Top, Iv(a,b) -> Iv(N_inf, b) 
 >                     ^
 > Error (warning 27 [unused-var-strict]): unused variable a.
-> File "hw2/hw2.ml", line 727, characters 9-10:
+> File "hw1/interval.ml", line 727, characters 9-10:
 > 727 |     | Iv(a,b), Top -> s_value 
 >                ^
 > Error (warning 27 [unused-var-strict]): unused variable a.
-> File "hw2/hw2.ml", line 727, characters 11-12:
+> File "hw1/interval.ml", line 727, characters 11-12:
 > 727 |     | Iv(a,b), Top -> s_value 
 >                  ^
 > Error (warning 27 [unused-var-strict]): unused variable b.
-> File "hw2/hw2.ml", line 728, characters 20-22:
+> File "hw1/interval.ml", line 728, characters 20-22:
 > 728 |     | Iv(a1,a2), Iv(b1,b2) -> if not(Interval.comp a1 b2) then Bot else (
 >                           ^^
 > Error (warning 27 [unused-var-strict]): unused variable b1.
-> File "hw2/hw2.ml", line 736, characters 14-15:
+> File "hw1/interval.ml", line 736, characters 14-15:
 > 736 |     | Top, Iv(a,b) -> Top 
 >                     ^
 > Error (warning 27 [unused-var-strict]): unused variable a.
-> File "hw2/hw2.ml", line 736, characters 16-17:
+> File "hw1/interval.ml", line 736, characters 16-17:
 > 736 |     | Top, Iv(a,b) -> Top 
 >                       ^
 > Error (warning 27 [unused-var-strict]): unused variable b.
-> File "hw2/hw2.ml", line 737, characters 11-12:
+> File "hw1/interval.ml", line 737, characters 11-12:
 > 737 |     | Iv(a,b), Top -> Iv(a, P_inf) 
 >                  ^
 > Error (warning 27 [unused-var-strict]): unused variable b.
-> File "hw2/hw2.ml", line 738, characters 12-14:
+> File "hw1/interval.ml", line 738, characters 12-14:
 > 738 |     | Iv(a1,a2), Iv(b1,b2) -> if not(Interval.comp a1 b2) then Bot else (
 >                   ^^
 > Error (warning 27 [unused-var-strict]): unused variable a2.
-> File "hw2/hw2.ml", line 759, characters 23-26:
+> File "hw1/interval.ml", line 759, characters 23-26:
 > 759 |   | Mult (Var s, Const mul) -> if name = s then (left, right, true) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
 >                              ^^^
 > Error (warning 27 [unused-var-strict]): unused variable mul.
-> File "hw2/hw2.ml", line 760, characters 16-19:
+> File "hw1/interval.ml", line 760, characters 16-19:
 > 760 |   | Mult (Const mul, Var s) -> if name = s then (left, right, true) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
 >                       ^^^
 > Error (warning 27 [unused-var-strict]): unused variable mul.
-> File "hw2/hw2.ml", line 767, characters 23-26:
+> File "hw1/interval.ml", line 767, characters 23-26:
 > 767 |   | Mult (Var s, Const mul) -> if name = s then (right, left, false) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
 >                              ^^^
 > Error (warning 27 [unused-var-strict]): unused variable mul.
-> File "hw2/hw2.ml", line 768, characters 16-19:
+> File "hw1/interval.ml", line 768, characters 16-19:
 > 768 |   | Mult (Const mul, Var s) -> if name = s then (right, left, false) else raise (Failure "Error in trans_aux: Var that we do not want to find found.") 
 >                       ^^^
 > Error (warning 27 [unused-var-strict]): unused variable mul.
-> File "hw2/hw2.ml", line 776, characters 10-11:
+> File "hw1/interval.ml", line 776, characters 10-11:
 > 776 |   | Const i       -> Mult (obj, sub) 
 >                 ^
 > Error (warning 27 [unused-var-strict]): unused variable i.
-> File "hw2/hw2.ml", line 777, characters 10-11:
+> File "hw1/interval.ml", line 777, characters 10-11:
 > 777 |   | Var   s       -> Mult (obj, sub) 
 >                 ^
 > Error (warning 27 [unused-var-strict]): unused variable s.
-> File "hw2/hw2.ml", line 783, characters 10-11:
+> File "hw1/interval.ml", line 783, characters 10-11:
 > 783 |   | Const i       -> false 
 >                 ^
 > Error (warning 27 [unused-var-strict]): unused variable i.
-> File "hw2/hw2.ml", line 790, characters 10-11:
+> File "hw1/interval.ml", line 790, characters 10-11:
 > 790 |   | Const i       -> lst 
 >                 ^
 > Error (warning 27 [unused-var-strict]): unused variable i.
-> File "hw2/hw2.ml", line 791, characters 10-11:
+> File "hw1/interval.ml", line 791, characters 10-11:
 > 791 |   | Var   s       -> aexp::lst 
 >                 ^
 > Error (warning 27 [unused-var-strict]): unused variable s.
-> File "hw2/hw2.ml", line 837, characters 18-19:
+> File "hw1/interval.ml", line 837, characters 18-19:
 > 837 |   | hd::tl -> let n, ins = hd in 
 >                         ^
 > Error (warning 27 [unused-var-strict]): unused variable n.

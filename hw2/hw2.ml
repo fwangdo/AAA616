@@ -271,23 +271,59 @@ end
 
 (* Added in hw2*)
 module type AbsLoc = sig 
-  type t = 
+  type atom = 
+    | Bot
+    | Top
     | Var of string 
     | Allsite of int (* the number of node *) 
 
-  val to_string : t -> string 
+  type t = atom list 
+
+  val string_of_atom : atom -> string
+  val to_string : t -> string -> string 
+  val bottom : atom 
+
+  val order : t -> t -> bool 
+  val join : t -> t -> t
+  val meet : t -> t -> t -> t 
+  (* val widen : t -> t -> t *)
+  (* val narrow : t -> t -> t *)
 end
 
 (* TODO *)
 module AbsLoc : AbsLoc = struct 
-  type t = 
+  type atom = 
+    | Bot
+    | Top
     | Var of string 
     | Allsite of int (* the number of node *) 
 
-  let to_string : t -> string 
+  type t = atom list
+  let string_of_atom : atom -> string 
   = fun a -> match a with 
+    | Bot       -> "Bot in location"
+    | Top       -> "Top in location"
     | Var s     -> "Var " ^ s 
     | Allsite i -> "Allsite " ^ string_of_int i 
+
+  let rec to_string : t -> string -> string
+  = fun lst str -> match lst with 
+    | hd::tl -> let str' = str ^ ", " ^ string_of_atom hd in to_string tl str' 
+    | _      -> str
+  let bottom = Bot
+
+  let rec order l1 l2 = match l1 with 
+    | hd::tl -> if (List.mem hd l2) then order tl l2 else false 
+    | _      -> true 
+    
+  let rec join l1 l2 = match l1 with  
+    | hd::tl -> if (List.mem hd l2) then join tl l2 else join tl (hd::l2)
+    | _      -> l2 
+
+  let rec meet l1 l2 lst = match l1 with  
+    | hd::tl -> if (List.mem hd l2) then meet tl l2 (hd::lst) else meet tl l2 lst 
+    | _      -> lst 
+
 end
 
 module type Interval = sig
@@ -535,16 +571,14 @@ module Interval : Interval = struct
         if intersection a b then AbsBool.Top else AbsBool.False  (* b1 is less than a2 without intersection. it means whole range of b is less then range of a. *)
 end
 
-module Value = struct
-  type t = | AbsLoc | Interval
-end
 
 module VarMap = Map.Make(String)
 module type AbsMem = sig
-  type t = Value.t VarMap.t 
+  type value = (AbsLoc.t * Interval.t)
+  type t     = (AbsLoc.t * Interval.t) VarMap.t 
   val empty : t
-  val add : string -> Interval.t -> t -> t
-  val find : string -> t -> Interval.t 
+  val add : string -> value -> t -> t
+  val find : string -> t -> value 
   val join : t -> t -> t 
   val meet : t -> t -> t 
   val widen : t -> t -> t 
@@ -553,17 +587,17 @@ module type AbsMem = sig
   val print : t -> unit 
 end
 
-
 (* this one is for caculation while executing commands with absmem *)
 module AbsMem : AbsMem = struct
-  type t = Value.t VarMap.t 
+  type value = (AbsLoc.t * Interval.t)
+  type t     = value VarMap.t 
 
-  let print m = VarMap.iter (fun x v -> prerr_endline 
-    (x ^ " |-> " ^ Interval.to_string v)) m 
+  let print m = VarMap.iter (fun x (l, v) -> prerr_endline 
+    (x ^ " |-> " ^ (AbsLoc.to_string l) ^ " | " ^ (Interval.to_string v))) m 
 
   let empty = VarMap.empty
 
-  let find x m = try VarMap.find x m with _ -> Interval.bottom 
+  let find x m = try VarMap.find x m with _ -> (AbsLoc.bottom, Interval.bottom) 
 
   let add x v m = VarMap.add x v m  
 
@@ -571,7 +605,7 @@ module AbsMem : AbsMem = struct
 
   let debug : string list -> string -> string 
   = fun lst s -> match lst with 
-    | hd::tl -> s ^ hd 
+    | hd::_ -> s ^ hd  
     | _ -> s
 
   let rec union_keys : string list -> string list -> string list 
@@ -579,20 +613,14 @@ module AbsMem : AbsMem = struct
     | hd::tl -> if List.mem hd a then union_keys a tl else union_keys (hd::a) tl 
     | [] -> a 
 
-  let rec calc : (Interval.t -> Interval.t -> Interval.t) -> t -> t -> string list -> t -> t
+  let rec calc : (value -> value -> value) -> t -> t -> string list -> t -> t
   = fun f m1 m2 keys m3 -> match keys with
     | hd::tl -> let m2_val = find hd m2 in let m1_val = find hd m1 in 
                 let m3' = add hd (f m1_val m2_val) m3 in
-                (**)
-                (* let _ = print_endline ("[AbsMem m1,m2]" ^ (Interval.to_string m1_val) ^ (Interval.to_string m1_val)) in
-                let _ = print_endline "[AbsMem keys]"; print_endline hd in
-                let _ = print_endline "[AbsMem join]"; let s_m3 = Interval.to_string (f m1_val m2_val) in print_endline (s_m3) in 
-                let _ = print_endline "[AbsMem widen]"; print m3' in  *)
-                (**)
                 calc f m1 m2 tl m3'
-    | _ -> m3
+    | _ -> m3 
 
-  let rec calc_bool : (Interval.t -> Interval.t -> bool) -> t -> t -> string list -> bool 
+  let rec calc_bool : (value -> value -> bool) -> t -> t -> string list -> bool 
   = fun f m1 m2 keys -> match keys with
     | hd::tl -> let m2_val = find hd m2 in let m1_val = find hd m1 in 
                 if (f m1_val m2_val) then calc_bool f m1 m2 tl else false   
