@@ -409,7 +409,7 @@ module Interval : Interval = struct
     | Top, _ -> Top 
     | _, Top -> Top 
      (* interval cases. thinks about inf cases frist!*)
-    | Iv(a1, a2), Iv(b1, b2) -> if (comp a1 b1) && (comp a2 b2) then Iv(a1, b2) 
+    | Iv(a1, a2), Iv(b1, b2) -> if      (comp a1 b1) && (comp a2 b2) then Iv(a1, b2) 
                                 else if (comp a1 b1) && (comp b2 a2) then Iv(a1, a2)
                                 else if (comp b1 a1) && (comp a2 b2) then Iv(b1, b2)
                                 else if (comp b1 a1) && (comp b2 a2) then Iv(b1, a2)
@@ -593,11 +593,11 @@ module AbsMem : AbsMem = struct
   type t     = value VarMap.t 
 
   let print m = VarMap.iter (fun x (l, v) -> prerr_endline 
-    (x ^ " |-> " ^ (AbsLoc.to_string l) ^ " | " ^ (Interval.to_string v))) m 
+    (x ^ " |-> " ^ (AbsLoc.to_string l "") ^ " | " ^ (Interval.to_string v))) m 
 
   let empty = VarMap.empty
 
-  let find x m = try VarMap.find x m with _ -> (AbsLoc.bottom, Interval.bottom) 
+  let find x m = try VarMap.find x m with _ -> ([AbsLoc.bottom], Interval.bottom) 
 
   let add x v m = VarMap.add x v m  
 
@@ -619,6 +619,13 @@ module AbsMem : AbsMem = struct
                 let m3' = add hd (f m1_val m2_val) m3 in
                 calc f m1 m2 tl m3'
     | _ -> m3 
+  (* and calc_interval : (Interval.t -> Interval.t -> Interval.t) -> t -> t -> string list -> t -> t
+  = fun f m1 m2 keys m3 -> match keys with
+    | hd::tl -> let (m2_loc, m2_iv) = find hd m2 in let (m1_loc, m1_iv) = find hd m1 in 
+                let (m3_loc, m3_iv) = find hd m3 in  
+                let m3' = add hd (f m1_iv m2_iv) m3 in
+                calc f m1 m2 tl m3'
+    | _ -> m3 *)
 
   let rec calc_bool : (value -> value -> bool) -> t -> t -> string list -> bool 
   = fun f m1 m2 keys -> match keys with
@@ -627,42 +634,54 @@ module AbsMem : AbsMem = struct
     | _ -> true 
   
   (* m2 is bigger than m1 *)
-  let join m1 m2 = 
+  let rec join m1 m2 = 
     (* let _  = print_endline __FUNCTION__ in  *)
     let m1' = VarMap.bindings m1 in 
     let m2' = VarMap.bindings m2 in 
     let m1_keys = keys m1' in
     let m2_keys = keys m2' in  
     let keys = union_keys m1_keys m2_keys in 
-    let m3 = empty in calc (Interval.join) m1 m2 keys m3 
+    let m3 = empty in calc join_aux m1 m2 keys m3 
+  and join_aux : value -> value -> value 
+  = fun a b -> let (a_loc, a_iv) = a in let (b_loc, b_iv) = b in 
+  let a' = AbsLoc.join a_loc b_loc in let b' = Interval.join a_iv b_iv in (a', b') 
     
-   let meet : t -> t -> t 
+   let rec meet : t -> t -> t 
    = fun m1 m2 -> 
     let m1' = VarMap.bindings m1 in 
     let m2' = VarMap.bindings m2 in 
     let m1_keys = keys m1' in
     let m2_keys = keys m2' in  
     let keys = union_keys m1_keys m2_keys in 
-    let m3 = empty in calc (Interval.meet) m1 m2 keys m3  
+    let m3 = empty in calc (meet_aux) m1 m2 keys m3  
+  and meet_aux : value -> value -> value 
+  = fun a b -> let (a_loc, a_itv) = a in let (b_loc, b_itv) = b in 
+  let a' = AbsLoc.meet a_loc b_loc [] in let b' = Interval.meet a_itv b_itv in (a', b') 
 
-  let widen m1 m2 = 
+  let rec widen m1 m2 = 
     (* let _  = print_endline __FUNCTION__ in  *)
     let m1' = VarMap.bindings m1 in 
     let m2' = VarMap.bindings m2 in 
     let m1_keys = keys m1' in
     let m2_keys = keys m2' in  
     let keys = union_keys m1_keys m2_keys in 
-    let m3 = empty in calc (Interval.widen) m1 m2 keys m3 
- 
-  let narrow m1 m2 = 
+    let m3 = empty in calc (widen_aux) m1 m2 keys m3 
+  and widen_aux : value -> value -> value 
+  = fun a b -> let (a_loc, a_itv) = a in let (b_loc, b_itv) = b in 
+  let a' = AbsLoc.join a_loc b_loc in let b' = Interval.widen a_itv b_itv in (a', b') 
+
+  let rec narrow m1 m2 = 
     (* let _  = print_endline __FUNCTION__ in  *)
     let m1' = VarMap.bindings m1 in 
     let m2' = VarMap.bindings m2 in 
     let m1_keys = keys m1' in
     let m2_keys = keys m2' in  
     let keys = union_keys m1_keys m2_keys in 
-    let m3 = empty in calc (Interval.narrow) m1 m2 keys m3 
- 
+    let m3 = empty in calc (narrow_aux) m1 m2 keys m3 
+  and narrow_aux : value -> value -> value 
+  = fun a b -> let (a_loc, a_itv) = a in let (b_loc, b_itv) = b in 
+  let a' = AbsLoc.meet a_loc b_loc [] in let b' = Interval.narrow a_itv b_itv in (a', b') 
+
   (* only if all cases are true. *)
   let rec order m1 m2 = 
     (* let _  = print_endline __FUNCTION__ in  *)
@@ -671,7 +690,11 @@ module AbsMem : AbsMem = struct
     let m1_keys = keys m1' in
     let m2_keys = keys m2' in  
     let keys = union_keys m1_keys m2_keys in 
-    calc_bool (Interval.order) m1 m2 keys
+    calc_bool (order_aux) m1 m2 keys
+    and order_aux : value -> value -> bool 
+    = fun a b -> let (a_loc, a_itv) = a in let (b_loc, b_itv) = b in 
+    let a' = AbsLoc.order a_loc b_loc in let b' = Interval.order a_itv b_itv in 
+    if (a' = true) && (b' = true) then true else false 
 
 end
 
