@@ -835,7 +835,7 @@ and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
                                           if not then mem 
                                           else (let new_val = Value.meet s1' s2' in let mem' = VarMap.update (convert_loc s1) (update_option ([], new_val)) mem 
                                                in VarMap.update (convert_loc s2) (update_option ([], new_val)) mem')
-                      | _, _ -> update_mem exp mem)  
+                      | _, _ -> raise (Failure "Impossible case in not equal case."))  
   | Le    (a1, a2) -> (match a1, a2 with
                       | Const n1, Const n2 -> mem (* bottom? or normal execution? *)
                       | Const n, Lv s -> let s' = convert_loc s in 
@@ -844,23 +844,10 @@ and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
                       | Lv s, Const n -> let s' = convert_loc s in
                         if not then execute_bexp (Le(Const(n+1), a1)) mem false  
                                else let _, t1 = (AbsMem.find s' mem) in let new_iv = (handle_le t1 n true) in VarMap.update s' (update_option ([], new_iv)) mem
-                      | _, _ -> update_mem exp mem)
+                      | _, _ -> raise (Failure "Impossible case in not equal case."))
   | Not   b        -> execute_bexp b mem (if not then false else true) (* then -> double negation. *)  
   | And   (b1, b2) -> if not then let mem' = execute_bexp b1 mem not in let mem'' = execute_bexp b2 mem not in AbsMem.join mem' mem''  
                       else let temp1 = execute_bexp b1 mem not in let temp2 = execute_bexp b2 mem not in (AbsMem.meet temp1 temp2)
-(* To consider relation between variables. *)
-(* need to fix code to consider order and le cases.*)
-and update_mem : bexp -> AbsMem.t -> AbsMem.t 
-= fun bexp mem -> 
-  match bexp with 
-  (* need to handle a case where there is no var. *)
-  | Equal (a1, a2) -> let left = find_var a1 [] in let right = find_var a2 [] in  
-                      if ((left@right) |> List.length) = 0 then mem else
-                      (let rcd = composition left a1 a2 true true mem mem in composition right a1 a2 false true mem rcd)   
-  | Le    (a1, a2) -> let left = find_var a1 [] in let right = find_var a2 [] in 
-                      if ((left@right) |> List.length) = 0 then mem else
-                      (let rcd = composition left a1 a2 true false mem mem in composition right a1 a2 false false mem rcd)
-  | _ -> mem
 and update_aux : (exp * Value.t * bool) -> isEqual:bool -> mem:AbsMem.t -> (string * Value.t) 
 = fun (var, iv, isLeft) ~isEqual ~mem -> let name = (function | Lv (Var s) -> s | _ -> raise (Failure "Error in name")) var in 
   if isEqual then (let temp = eq_aux name iv mem in (name, temp)) 
@@ -897,13 +884,6 @@ and le_aux : string -> Value.t -> bool -> AbsMem.t -> Value.t
                               let new_a = if (Value.comp a1 b1) then b1 else a1 in 
                               let new_b = b2 in Iv(new_a, new_b))
     | _, _ -> raise (Failure "undefined"))
-(* this func composes trans_aux with inter_execute *)
-and composition : exp list -> exp -> exp -> bool -> bool -> AbsMem.t -> AbsMem.t -> AbsMem.t -> AbsMem.t 
-= fun lst left right isLeft isEqual mem rcd adh -> match lst with (* rcd means record. *) 
-  | hd::tl -> let (name, iv) = (trans_aux hd left right isLeft) |> (inter_execute ~mem:mem) |> (update_aux ~isEqual:isEqual ~mem:mem) in 
-              let name' = BaseLoc.Var name in rcd 
-              (* let rcd' = VarMap.update name' (update_option iv) rcd in composition tl left right isLeft isEqual mem rcd' *)
-  | _      -> rcd 
 (*right should be calculated more. then, need to applied to execute_aexp. *)
 (*and inter_execute : (exp * exp * bool) -> mem:AbsMem.t -> (exp * Value.t * bool)
 = fun (left, right, isLeft) ~mem -> let va = execute_exp right mem in match left, right with (* left is the one should be updated. *) 
@@ -988,7 +968,7 @@ let rec first_fhat : Node.t list -> Cfg.t -> Table.t -> Table.t
               let preds' = List.map (Table.find ~t:tab) preds in  (* AbsMem of predecessors *)
               (* let _ = print_endline ("[Pred of Node " ^ (string_of_int n) ^ "]" ^ (List.fold_right Node.to_string preds "")) in  *)
               let lub = List.fold_right AbsMem.join preds' AbsMem.empty in (* LUB of predecessors *)
-              let s = execute ins lub in (* applying f_hat *) 
+              let s = execute n ins lub in (* applying f_hat *) 
               let n_tab = NodeMap.update hd (update_option s) tab in first_fhat tl cfg n_tab
   | _      -> tab 
 
@@ -998,7 +978,7 @@ let rec widening : Node.t list -> Cfg.t -> Table.t -> Table.t
               let preds = NodeSet.elements (Cfg.preds hd cfg) in (* node of predecessors *) 
               let preds' = List.map (Table.find ~t:tab) preds in  (* AbsMem of predecessors *)
               let lub = List.fold_right AbsMem.join preds' AbsMem.empty in (* LUB of predecessors *)
-              let s = execute ins lub in (* applying f_hat *) 
+              let s = execute n ins lub in (* applying f_hat *) 
               let b_mem = Table.find hd ~t:tab in 
               if AbsMem.order s b_mem then widening tl cfg tab 
               else let n_mem = AbsMem.widen b_mem s in 
@@ -1012,7 +992,7 @@ let rec narrowing : Node.t list -> Cfg.t -> Table.t -> Table.t
               let preds = NodeSet.elements (Cfg.preds (n,ins) cfg) in (* node of predecessors *) 
               let preds' = List.map (Table.find ~t:tab) preds in  (* AbsMem of predecessors *)
               let lub = List.fold_right AbsMem.join preds' AbsMem.empty in (* LUB of predecessors *)
-              let s = execute ins lub in (* applying f_hat *) 
+              let s = execute n ins lub in (* applying f_hat *) 
               let b_mem = Table.find hd ~t:tab in 
               if AbsMem.order b_mem s then narrowing tl cfg tab 
               else let n_mem = AbsMem.narrow b_mem s in let n_tab = NodeMap.update hd (update_option n_mem) tab in 
