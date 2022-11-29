@@ -336,7 +336,7 @@ module AbsLoc : AbsLoc = struct
 
 end
 
-module type Interval = sig
+module type Value = sig
   type atom = Con of int | N_inf | P_inf
   type t    = Bot | Top | Iv of atom * atom | Var of string | Allsite of int    
   val bottom : t
@@ -358,7 +358,7 @@ module type Interval = sig
   val comp : atom -> atom -> bool
 end
 
-module Interval : Interval = struct
+module Value : Value = struct
   type atom = Con of int | N_inf | P_inf
   (* N_inf means negative infinite, P_int means postiive negative.*)
   type t = Bot | Top | Iv of atom * atom | Var of string | Allsite of int 
@@ -596,8 +596,8 @@ end
 
 module VarMap = Map.Make(BaseLoc)
 module type AbsMem = sig
-  type value = (AbsLoc.t * Interval.t)
-  type t     = (AbsLoc.t * Interval.t) VarMap.t 
+  type value = (AbsLoc.t * Value.t)
+  type t     = (AbsLoc.t * Value.t) VarMap.t 
   val empty : t
   val add : BaseLoc.t -> value -> t -> t
   val find : BaseLoc.t -> t -> value 
@@ -611,15 +611,15 @@ end
 
 (* this one is for caculation while executing commands with absmem *)
 module AbsMem : AbsMem = struct
-  type value = (AbsLoc.t * Interval.t)
+  type value = (AbsLoc.t * Value.t)
   type t     = value VarMap.t 
 
   let print m = VarMap.iter (fun x (l, v) -> prerr_endline 
-    (BaseLoc.to_string x ^ " |-> " ^ (AbsLoc.to_string l "") ^ " | " ^ (Interval.to_string v))) m 
+    (BaseLoc.to_string x ^ " |-> " ^ (AbsLoc.to_string l "") ^ " | " ^ (Value.to_string v))) m 
 
   let empty = VarMap.empty
 
-  let find x m = try VarMap.find x m with _ -> ([AbsLoc.bottom], Interval.bottom) 
+  let find x m = try VarMap.find x m with _ -> ([AbsLoc.bottom], Value.bottom) 
 
   let add x v m = VarMap.add x v m  
 
@@ -659,7 +659,7 @@ module AbsMem : AbsMem = struct
     let m3 = empty in calc join_aux m1 m2 keys m3 
   and join_aux : value -> value -> value 
   = fun a b -> let (a_loc, a_iv) = a in let (b_loc, b_iv) = b in 
-  let a' = AbsLoc.join a_loc b_loc in let b' = Interval.join a_iv b_iv in (a', b') 
+  let a' = AbsLoc.join a_loc b_loc in let b' = Value.join a_iv b_iv in (a', b') 
     
    let rec meet : t -> t -> t 
    = fun m1 m2 -> 
@@ -671,7 +671,7 @@ module AbsMem : AbsMem = struct
     let m3 = empty in calc (meet_aux) m1 m2 keys m3  
   and meet_aux : value -> value -> value 
   = fun a b -> let (a_loc, a_itv) = a in let (b_loc, b_itv) = b in 
-  let a' = AbsLoc.meet a_loc b_loc [] in let b' = Interval.meet a_itv b_itv in (a', b') 
+  let a' = AbsLoc.meet a_loc b_loc [] in let b' = Value.meet a_itv b_itv in (a', b') 
 
   let rec widen m1 m2 = 
     (* let _  = print_endline __FUNCTION__ in  *)
@@ -683,7 +683,7 @@ module AbsMem : AbsMem = struct
     let m3 = empty in calc (widen_aux) m1 m2 keys m3 
   and widen_aux : value -> value -> value 
   = fun a b -> let (a_loc, a_itv) = a in let (b_loc, b_itv) = b in 
-  let a' = AbsLoc.join a_loc b_loc in let b' = Interval.widen a_itv b_itv in (a', b') 
+  let a' = AbsLoc.join a_loc b_loc in let b' = Value.widen a_itv b_itv in (a', b') 
 
   let rec narrow m1 m2 = 
     (* let _  = print_endline __FUNCTION__ in  *)
@@ -695,7 +695,7 @@ module AbsMem : AbsMem = struct
     let m3 = empty in calc (narrow_aux) m1 m2 keys m3 
   and narrow_aux : value -> value -> value 
   = fun a b -> let (a_loc, a_itv) = a in let (b_loc, b_itv) = b in 
-  let a' = AbsLoc.meet a_loc b_loc [] in let b' = Interval.narrow a_itv b_itv in (a', b') 
+  let a' = AbsLoc.meet a_loc b_loc [] in let b' = Value.narrow a_itv b_itv in (a', b') 
 
   (* only if all cases are true. *)
   let rec order m1 m2 = 
@@ -708,7 +708,7 @@ module AbsMem : AbsMem = struct
     calc_bool (order_aux) m1 m2 keys
     and order_aux : value -> value -> bool 
     = fun a b -> let (a_loc, a_itv) = a in let (b_loc, b_itv) = b in 
-    let a' = AbsLoc.order a_loc b_loc in let b' = Interval.order a_itv b_itv in 
+    let a' = AbsLoc.order a_loc b_loc in let b' = Value.order a_itv b_itv in 
     if (a' = true) && (b' = true) then true else false 
 end
 
@@ -734,27 +734,27 @@ module Table : Table = struct
     prerr_endline "") t  
 end
 
-(* let fold_update : (f * (aexp * Interval.t)) -> AbsMem.t -> AbsMem.t
+(* let fold_update : (f * (aexp * Value.t)) -> AbsMem.t -> AbsMem.t
 = fun (var, iv) mem -> let before = AbsMem.find var mem in 
   VarMap.update var (f before iv) mem *)
 
 (* I could have used 'meet' but I wrote additional function. *)
-let handle_le : Interval.t -> int -> bool -> Interval.t
+let handle_le : Value.t -> int -> bool -> Value.t
 = fun iv i ord -> 
-  let ii = Interval.Con i in 
-  let ip = Interval.Con(i+1) in
-  let im = Interval.Con(i-1) in
+  let ii = Value.Con i in 
+  let ip = Value.Con(i+1) in
+  let im = Value.Con(i-1) in
   match iv with (* if ord is true, then x <= iv, else iv <= x *)
-  | Interval.Bot -> Interval.Bot
-  | Interval.Top -> if ord then Interval.Iv(Interval.N_inf, (Interval.Con i)) else Interval.Iv((Interval.Con i), Interval.P_inf)
-  | Interval.Iv(i1, i2) -> if ord then (if (Interval.comp ip i1) then Interval.Bot else (if (Interval.comp i2 im) then iv else Interval.Iv(i1, ii))) 
-                                  else (if (Interval.comp i2 im) then Interval.Bot else (if (Interval.comp ip i1) then iv else Interval.Iv(ii, i2)))
+  | Value.Bot -> Value.Bot
+  | Value.Top -> if ord then Value.Iv(Value.N_inf, (Value.Con i)) else Value.Iv((Value.Con i), Value.P_inf)
+  | Value.Iv(i1, i2) -> if ord then (if (Value.comp ip i1) then Value.Bot else (if (Value.comp i2 im) then iv else Value.Iv(i1, ii))) 
+                                  else (if (Value.comp i2 im) then Value.Bot else (if (Value.comp ip i1) then iv else Value.Iv(ii, i2)))
     | _ -> raise (Failure "undefined")
 
 let update_option a = function | None -> Some a | Some _ -> Some a  
 
 (* check location or arithmetic value *)
-let check_location : Interval.t -> bool (* return true when it is location*) 
+let check_location : Value.t -> bool (* return true when it is location*) 
 = fun va -> match va with 
   | Bot -> true   
   | Top -> true
@@ -770,13 +770,13 @@ let rec execute : int -> Node.instr -> AbsMem.t -> AbsMem.t
                               let a2' = execute_exp a2 mem in 
                               let loc', mem' = AbsMem.find s' mem in
                               if check_location a2' 
-                              then VarMap.update (BaseLoc.Var s) (update_option ([a2'], Interval.Bot)) mem 
+                              then VarMap.update (BaseLoc.Var s) (update_option ([a2'], Value.Bot)) mem 
                               else ([AbsLoc.Bottom], a2')
   | I_skip     -> mem  
   | I_assume b -> execute_bexp b mem false  
   | I_alloc l  -> (* 1. Add new allocsite in l, 2. Add 0 in new location. *) 
-                  let zero     = Interval.alpha 0 in 
-                  let addr     = Interval.Allsite idx in 
+                  let zero     = Value.alpha 0 in 
+                  let addr     = Value.Allsite idx in 
                   let mem'     = VarMap.update addr (update_option zero) mem in 
                   (* let (loc', _) = mem' in  *)
                   begin match l with 
@@ -785,13 +785,13 @@ let rec execute : int -> Node.instr -> AbsMem.t -> AbsMem.t
                     end
   (* need to add I_alloc *)
 (* we need to caculate values of aexp but value in vars are abstracted *)
-and execute_exp : exp -> AbsMem.t -> Interval.t 
+and execute_exp : exp -> AbsMem.t -> Value.t 
 = fun exp mem -> match exp with 
-  | Const i       -> Interval.alpha i 
+  | Const i       -> Value.alpha i 
   | Var   s       -> AbsMem.find s mem 
-  | Plus (a1, a2) -> Interval.add (execute_aexp a1 mem) (execute_aexp a2 mem)
-  | Mult (a1, a2) -> Interval.mul (execute_aexp a1 mem) (execute_aexp a2 mem)
-  | Sub  (a1, a2) -> Interval.sub (execute_aexp a1 mem) (execute_aexp a2 mem)
+  | Plus (a1, a2) -> Value.add (execute_aexp a1 mem) (execute_aexp a2 mem)
+  | Mult (a1, a2) -> Value.mul (execute_aexp a1 mem) (execute_aexp a2 mem)
+  | Sub  (a1, a2) -> Value.sub (execute_aexp a1 mem) (execute_aexp a2 mem)
   | Lv   (Ptr p)  -> execute_exp (Lv p) mem
   | Lv   (Var s)  -> AbsMem.find (Var s) mem
   | Loc  lv       -> AbsMem.find lv mem 
@@ -806,10 +806,10 @@ and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
                       | Var s, Const n -> let temp = AbsMem.find s mem in
                         if not 
                         then  let output = (match temp with 
-                                | Iv (Con a, Con b) -> if (a = n) && (b = n) then Interval.Bot else(
+                                | Iv (Con a, Con b) -> if (a = n) && (b = n) then Value.Bot else(
                                                         if a = b then temp 
-                                                        else if a = n then Iv (Interval.Con (a+1), Interval.Con b)
-                                                        else if b = n then Iv (Interval.Con a, Interval.Con (b-1))  
+                                                        else if a = n then Iv (Value.Con (a+1), Value.Con b)
+                                                        else if b = n then Iv (Value.Con a, Value.Con (b-1))  
                                                         else temp)
                                 | Iv (N_inf, Con b) -> if b = n then Iv (N_inf, Con (b-1)) else temp
                                 | Iv (Con a, P_inf) -> if a = n then Iv (Con (a+1), P_inf) else temp
@@ -817,10 +817,10 @@ and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
                                 | Bot -> Bot
                                 | Top -> Top
                                 | _ -> raise (Failure "Impossible case in not equal case.")) in VarMap.update s (update_option output) mem  
-                        else let new_val = Interval.meet temp (Interval.alpha n) in VarMap.update s (update_option new_val) mem 
+                        else let new_val = Value.meet temp (Value.alpha n) in VarMap.update s (update_option new_val) mem 
                       | Var s1, Var s2 -> let s1' = VarMap.find s1 mem in let s2' = VarMap.find s2 mem in 
                                           if not then mem 
-                                          else (let new_val = Interval.meet s1' s2' in let mem' = VarMap.update s1 (update_option new_val) mem in VarMap.update s2 (update_option new_val) mem')
+                                          else (let new_val = Value.meet s1' s2' in let mem' = VarMap.update s1 (update_option new_val) mem in VarMap.update s2 (update_option new_val) mem')
                       | _, _ -> update_mem exp mem)  
   | Le    (a1, a2) -> (match a1, a2 with
                       | Const n1, Const n2 -> mem (* bottom? or normal execution? *)
@@ -847,19 +847,19 @@ and update_mem : bexp -> AbsMem.t -> AbsMem.t
                       if ((left@right) |> List.length) = 0 then mem else
                       (let rcd = composition left a1 a2 true false mem mem in composition right a1 a2 false false mem rcd)
   | _ -> mem
-and update_aux : (exp * Interval.t * bool) -> isEqual:bool -> mem:AbsMem.t -> (string * Interval.t) 
+and update_aux : (exp * Value.t * bool) -> isEqual:bool -> mem:AbsMem.t -> (string * Value.t) 
 = fun (var, iv, isLeft) ~isEqual ~mem -> let name = (function | Var s -> s | _ -> raise (Failure "Error in name")) var in 
   if isEqual then (let temp = eq_aux name iv mem in (name, temp)) 
   else (let temp = le_aux name iv isLeft mem in (name, temp))   
-and eq_aux : string -> Interval.t -> AbsMem.t -> Interval.t
+and eq_aux : string -> Value.t -> AbsMem.t -> Value.t
 = fun name iv mem -> let s_value = AbsMem.find name mem in match s_value, iv with 
   | Bot, _ -> Bot 
   | _, Bot -> Bot 
   | Top, b -> b 
   | _, Top -> Top
-  | a, b   -> Interval.meet a b 
+  | a, b   -> Value.meet a b 
 (* need unit test. *)
-and le_aux : string -> Interval.t -> bool -> AbsMem.t -> Interval.t 
+and le_aux : string -> Value.t -> bool -> AbsMem.t -> Value.t 
 = fun name iv isLeft mem -> let s_value = AbsMem.find name mem in 
     if isLeft then 
     (match (s_value, iv) with  
@@ -868,9 +868,9 @@ and le_aux : string -> Interval.t -> bool -> AbsMem.t -> Interval.t
     | Top, Top -> Top 
     | Top, Iv(a,b) -> Iv(N_inf, b) 
     | Iv(a,b), Top -> s_value 
-    | Iv(a1,a2), Iv(b1,b2) -> if not(Interval.comp a1 b2) then Bot else (
+    | Iv(a1,a2), Iv(b1,b2) -> if not(Value.comp a1 b2) then Bot else (
                               let new_a = a1 in  
-                              let new_b = if (Interval.comp a2 b2) then a2 else b2 in Iv(new_a, new_b)))
+                              let new_b = if (Value.comp a2 b2) then a2 else b2 in Iv(new_a, new_b)))
     else 
     (match (iv, s_value) with  
     | Bot, _ -> Bot
@@ -878,8 +878,8 @@ and le_aux : string -> Interval.t -> bool -> AbsMem.t -> Interval.t
     | Top, Top -> Top 
     | Top, Iv(a,b) -> Top 
     | Iv(a,b), Top -> Iv(a, P_inf) 
-    | Iv(a1,a2), Iv(b1,b2) -> if not(Interval.comp a1 b2) then Bot else (
-                              let new_a = if (Interval.comp a1 b1) then b1 else a1 in 
+    | Iv(a1,a2), Iv(b1,b2) -> if not(Value.comp a1 b2) then Bot else (
+                              let new_a = if (Value.comp a1 b1) then b1 else a1 in 
                               let new_b = b2 in Iv(new_a, new_b)))
 (* this func composes trans_aux with inter_execute *)
 and composition : exp list -> exp -> exp -> bool -> bool -> AbsMem.t -> AbsMem.t -> AbsMem.t 
@@ -888,7 +888,7 @@ and composition : exp list -> exp -> exp -> bool -> bool -> AbsMem.t -> AbsMem.t
               let rcd' = VarMap.update name (update_option iv) rcd in composition tl left right isLeft isEqual mem rcd'
   | _      -> rcd 
 (*right should be calculated more. then, need to applied to execute_aexp. *)
-and inter_execute : (exp * exp * bool) -> mem:AbsMem.t -> (exp * Interval.t * bool)
+and inter_execute : (exp * exp * bool) -> mem:AbsMem.t -> (exp * Value.t * bool)
 = fun (left, right, isLeft) ~mem -> let va = execute_aexp right mem in match left, right with (* left is the one should be updated. *) 
   | Var s, _ -> (Var s, va, isLeft)  
   | Mult (Var s, Const z), _ -> let divided = div_aux va z in (Var s, divided, isLeft)
@@ -935,25 +935,25 @@ and find_var : exp -> exp list -> exp list (* will give you the vars with positi
   | Plus (a1, a2) -> (find_var a1 lst) @ (find_var a2 lst)
   | Mult (a1, a2) -> (find_var a1 lst) @ (find_var a2 lst)
   | Sub  (a1, a2) -> (find_var a1 lst) @ (find_var a2 lst)
-and div_aux : Interval.t -> int -> Interval.t 
+and div_aux : Value.t -> int -> Value.t 
 = fun iv div -> match iv with 
-  | Interval.Bot -> Interval.Bot 
-  | Interval.Top -> Interval.Top
-  | Interval.Iv(a, b) -> 
+  | Value.Bot -> Value.Bot 
+  | Value.Top -> Value.Top
+  | Value.Iv(a, b) -> 
     (match a, b with
     | N_inf, P_inf       -> iv
-    | N_inf, Con b'    -> Interval.Iv(a, Con (b' / div)) 
-    | Con a', P_inf    -> Interval.Iv(Con (a' / div), b) 
-    | Con a', Con b' -> let new_a = (a' / div) in let new_b = (b' / div) in let divided = Interval.Iv(Con new_a, Con new_b) in 
-                           (if ((new_a = new_b) && ((a' mod div) <> 0)) then Interval.Bot else divided) 
+    | N_inf, Con b'    -> Value.Iv(a, Con (b' / div)) 
+    | Con a', P_inf    -> Value.Iv(Con (a' / div), b) 
+    | Con a', Con b' -> let new_a = (a' / div) in let new_b = (b' / div) in let divided = Value.Iv(Con new_a, Con new_b) in 
+                           (if ((new_a = new_b) && ((a' mod div) <> 0)) then Value.Bot else divided) 
     | _ -> raise (Failure "Error in div_aux : Impossible cases "))
 (* check whether divided has at least one multiple of'div'. if not so, it's bottom. *) 
 
 (* consider relations between variables in eq, le. *)
-(* and aux_bexp : aexp -> aexp -> (aexp * Interval.t) list  
+(* and aux_bexp : aexp -> aexp -> (aexp * Value.t) list  
 = fun a1 a2 lst -> match a1, a2 with 
   | Const n1, Const n2 -> lst   
-  | Var s, Const n -> (s, Interval.alpha n)::lst  
+  | Var s, Const n -> (s, Value.alpha n)::lst  
   | Const n, Var s -> aux_bexp a2 a1 lst 
   | _, _           -> raise (Failure "Undefined")
   | Var s1, Var s2 -> let lst' = (s1)::lst
