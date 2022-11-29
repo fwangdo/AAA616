@@ -593,7 +593,6 @@ module Value : Value = struct
     | _ -> raise (Failure "undefined")
 end
 
-
 module VarMap = Map.Make(BaseLoc)
 module type AbsMem = sig
   type value = (AbsLoc.t * Value.t)
@@ -753,6 +752,12 @@ let handle_le : Value.t -> int -> bool -> Value.t
 
 let update_option a = function | None -> Some a | Some _ -> Some a  
 
+
+let rec convert_loc : lv -> BaseLoc.t
+= fun lv -> match lv with 
+  | Var s -> BaseLoc.Var s
+  | _     -> raise (Failure "this function cannot be applied to ptr")
+
 (* check location or arithmetic value *)
 let check_location : Value.t -> bool (* return true when it is location*) 
 = fun va -> match va with 
@@ -762,16 +767,25 @@ let check_location : Value.t -> bool (* return true when it is location*)
   | Var s -> true 
   | Allsite i -> true 
 
+let rec ptr_to_var : lv -> lv
+= fun lv -> match lv with 
+  | Var _ -> lv
+  | Ptr s -> ptr_to_var s
 
 (* int is the number of node. *)
 let rec execute : int -> Node.instr -> AbsMem.t -> AbsMem.t
 = fun idx cmd mem -> match cmd with 
-  | I_assign (Var s , a2) ->  let s'  = BaseLoc.Var s in 
-                              let a2' = execute_exp a2 mem in 
-                              let loc', mem' = AbsMem.find s' mem in
-                              if check_location a2' 
-                              then VarMap.update (BaseLoc.Var s) (update_option ([a2'], Value.Bot)) mem 
-                              else ([AbsLoc.Bottom], a2')
+  | I_assign (Var s, a2) -> let s'  = BaseLoc.Var s in 
+                            let a2' = (execute_exp a2 mem) in 
+                            let loc', mem' = AbsMem.find s' mem in
+                            VarMap.update (BaseLoc.Var s) (update_option a2') mem 
+  | I_assign (Ptr s, a2) -> let var = convert_loc (ptr_to_var s) in let (Var s') = var in 
+                            let a2' = (execute_exp a2 mem) in 
+                            let (loc', mem') = AbsMem.find var mem in 
+                            let number_of_loc: int = List.length loc' in 
+                            if number_of_loc = 1 
+                            then VarMap.update (BaseLoc.Var s') (update_option a2') mem 
+                            else AbsMem.join   
   | I_skip     -> mem  
   | I_assume b -> execute_bexp b mem false  
   | I_alloc l  -> (* 1. Add new allocsite in l, 2. Add 0 in new location. *) 
@@ -783,15 +797,12 @@ let rec execute : int -> Node.instr -> AbsMem.t -> AbsMem.t
                     | Var s -> VarMap.update l (update_option addr) mem' 
                     | Ptr p -> execute idx (I_alloc p) mem  
                     end
-  (* need to add I_alloc *)
-(* we need to caculate values of aexp but value in vars are abstracted *)
-and execute_exp : exp -> AbsMem.t -> Value.t 
+and execute_exp : exp -> AbsMem.t -> (AbsLoc.t * Value.t) 
 = fun exp mem -> match exp with 
-  | Const i       -> Value.alpha i 
-  | Var   s       -> AbsMem.find s mem 
-  | Plus (a1, a2) -> Value.add (execute_aexp a1 mem) (execute_aexp a2 mem)
-  | Mult (a1, a2) -> Value.mul (execute_aexp a1 mem) (execute_aexp a2 mem)
-  | Sub  (a1, a2) -> Value.sub (execute_aexp a1 mem) (execute_aexp a2 mem)
+  | Const i       -> ([BaseLoc.Bot], Value.alpha i) 
+  | Plus (a1, a2) -> Value.add (execute_exp a1 mem) (execute_exp a2 mem)
+  | Mult (a1, a2) -> Value.mul (execute_exp a1 mem) (execute_exp a2 mem)
+  | Sub  (a1, a2) -> Value.sub (execute_exp a1 mem) (execute_exp a2 mem)
   | Lv   (Ptr p)  -> execute_exp (Lv p) mem
   | Lv   (Var s)  -> AbsMem.find (Var s) mem
   | Loc  lv       -> AbsMem.find lv mem 
