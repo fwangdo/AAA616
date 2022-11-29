@@ -978,23 +978,13 @@ let rec first_fhat : Node.t list -> Cfg.t -> Table.t -> Table.t
 let rec widening : Node.t list -> Cfg.t -> Table.t -> Table.t
 = fun lst cfg tab -> match lst with 
   | hd::tl -> let n, ins = hd in 
-              (**)
-              (* let _ = print_endline "\n" in *)
-              (* let _ = Printf.printf "[Node]: %s \n" (string_of_int n) in   *)
-              (**)
               let preds = NodeSet.elements (Cfg.preds hd cfg) in (* node of predecessors *) 
               let preds' = List.map (Table.find ~t:tab) preds in  (* AbsMem of predecessors *)
               let lub = List.fold_right AbsMem.join preds' AbsMem.empty in (* LUB of predecessors *)
               let s = execute ins lub in (* applying f_hat *) 
-              (**)
-              (* let _ = print_endline ("[LUB]:"); AbsMem.print lub in   *)
-              (* let _ = print_endline ("[ S ]:"); AbsMem.print s   in  *)
-              (**)
               let b_mem = Table.find hd ~t:tab in 
               if AbsMem.order s b_mem then widening tl cfg tab 
               else let n_mem = AbsMem.widen b_mem s in 
-                   (* let _ = print_endline "[N_mem in widening]" in  *)
-                   (* let _ = AbsMem.print n_mem in  *)
                    let n_tab = NodeMap.update hd (update_option n_mem) tab in 
                    let succs = NodeSet.elements (Cfg.succs hd cfg) in widening (tl@succs) cfg n_tab
   | _      -> tab 
@@ -1007,12 +997,6 @@ let rec narrowing : Node.t list -> Cfg.t -> Table.t -> Table.t
               let lub = List.fold_right AbsMem.join preds' AbsMem.empty in (* LUB of predecessors *)
               let s = execute ins lub in (* applying f_hat *) 
               let b_mem = Table.find hd ~t:tab in 
-              (**)
-              (* let _ = print_endline "\n" in
-              let _ = Printf.printf "[Node]: %s \n" (string_of_int n) in 
-              let _ = print_endline ("[LUB]:"); AbsMem.print lub in  
-              let _ = print_endline ("[ S ]:"); AbsMem.print s   in   *)
-              (**)
               if AbsMem.order b_mem s then narrowing tl cfg tab 
               else let n_mem = AbsMem.narrow b_mem s in let n_tab = NodeMap.update hd (update_option n_mem) tab in 
                    let succs = NodeSet.elements (Cfg.succs hd cfg) in narrowing (tl@succs) cfg n_tab
