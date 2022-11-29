@@ -610,7 +610,7 @@ module AbsMem : AbsMem = struct
 
   let empty = VarMap.empty
 
-  let find x m = try VarMap.find x m with _ -> ([AbsLoc.bottom], Value.bottom) 
+  let find x m = try VarMap.find x m with _ -> ([], Value.bottom) 
 
   let add x v m = VarMap.add x v m  
 
@@ -750,6 +750,8 @@ let rec convert_loc : lv -> BaseLoc.t
   | Var s -> BaseLoc.Var s
   | _     -> raise (Failure "this function cannot be applied to ptr")
 
+let get_loc = function | BaseLoc.Var s -> s | Allsite _ -> raise (Failure "impossible case")
+
 (* check location or arithmetic value *)
 let check_location : Value.t -> bool (* return true when it is location*) 
 = fun va -> match va with 
@@ -776,10 +778,10 @@ let rec execute : int -> Node.instr -> AbsMem.t -> AbsMem.t
                             let a2' = (execute_exp a2 mem) in 
                             let loc', mem' = AbsMem.find s' mem in
                             VarMap.update (BaseLoc.Var s) (update_option a2') mem 
-  | I_assign (Ptr s, a2) -> let var = convert_loc (ptr_to_var s) in let (Var s') = var in 
+  | I_assign (Ptr s, a2) -> let var = convert_loc (ptr_to_var s) in let s' = get_loc var in 
                             let a2' = (execute_exp a2 mem) in 
                             let (loc', mem') = AbsMem.find var mem in 
-                            let number_of_loc: int = List.length loc' in 
+                            let number_of_loc = List.length loc' in 
                             if number_of_loc = 1 
                             then VarMap.update (BaseLoc.Var s') (update_option a2') mem 
                             else weak_update loc' mem a2' 
@@ -794,13 +796,16 @@ let rec execute : int -> Node.instr -> AbsMem.t -> AbsMem.t
                   let mem'': AbsMem.t = VarMap.update loca (update_option addr') mem' in mem'' 
 and execute_exp : exp -> AbsMem.t -> AbsMem.value 
 = fun exp mem -> match exp with 
-  | Const i       -> ([], Value.alpha i) 
-  | Plus (a1, a2) -> Value.add (execute_exp a1 mem) (execute_exp a2 mem)
-  | Mult (a1, a2) -> Value.mul (execute_exp a1 mem) (execute_exp a2 mem)
-  | Sub  (a1, a2) -> Value.sub (execute_exp a1 mem) (execute_exp a2 mem)
+  | Const i       -> ([], Value.alpha i)
+  | Plus (a1, a2) -> let _, a1' = (execute_exp a1 mem) in let _, a2' = (execute_exp a2 mem) in
+                     ([], Value.add a1' a2')
+  | Mult (a1, a2) -> let _, a1' = (execute_exp a1 mem) in let _, a2' = (execute_exp a2 mem) in
+                     ([], Value.mul  a1' a2')
+  | Sub  (a1, a2) -> let _, a1' = (execute_exp a1 mem) in let _, a2' = (execute_exp a2 mem) in
+                     ([], Value.sub a1' a2')
   | Lv   (Ptr p)  -> execute_exp (Lv p) mem
   | Lv   (Var s)  -> AbsMem.find (Var s) mem
-  | Loc  lv       -> AbsMem.find lv mem 
+  | Loc  lv       -> AbsMem.find (convert_loc lv) mem 
 (* this one will return memory itself.*)
 and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
 = fun exp mem not -> match exp with (* n_not means the number of not *) 
@@ -808,8 +813,9 @@ and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
   | False          -> if not then mem else AbsMem.empty
   | Equal (a1, a2) -> (match a1, a2 with
                       | Const n1, Const n2 -> if not then (if n1 = n2 then AbsMem.empty else mem) else (if n1 = n2 then mem else AbsMem.empty)
-                      | Const n, Var s -> execute_bexp (Equal(a2, a1)) mem not 
-                      | Var s, Const n -> let temp = AbsMem.find s mem in
+                      | Const n, Lv _ -> execute_bexp (Equal(a2, a1)) mem not 
+                      | Const n, Loc _ -> execute_bexp (Equal(a2, a1)) mem not 
+                      | Lv s, Const n -> let s' = convert_loc s in let _, temp = AbsMem.find s' mem in
                         if not 
                         then  let output = (match temp with 
                                 | Iv (Con a, Con b) -> if (a = n) && (b = n) then Value.Bot else(
@@ -822,20 +828,22 @@ and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
                                 | Iv (N_inf, P_inf) -> temp
                                 | Bot -> Bot
                                 | Top -> Top
-                                | _ -> raise (Failure "Impossible case in not equal case.")) in VarMap.update s (update_option output) mem  
-                        else let new_val = Value.meet temp (Value.alpha n) in VarMap.update s (update_option new_val) mem 
-                      | Var s1, Var s2 -> let s1' = VarMap.find s1 mem in let s2' = VarMap.find s2 mem in 
+                                | _ -> raise (Failure "Impossible case in not equal case.")) 
+                                in VarMap.update (convert_loc s) (update_option ([], output)) mem  
+                        else let new_val = Value.meet temp (Value.alpha n) in VarMap.update s' (update_option ([], new_val)) mem 
+                      | Lv s1, Lv s2 -> let _, s1' = VarMap.find (convert_loc s1) mem in let _, s2' = VarMap.find (convert_loc s2) mem in 
                                           if not then mem 
-                                          else (let new_val = Value.meet s1' s2' in let mem' = VarMap.update s1 (update_option new_val) mem in VarMap.update s2 (update_option new_val) mem')
+                                          else (let new_val = Value.meet s1' s2' in let mem' = VarMap.update (convert_loc s1) (update_option ([], new_val)) mem 
+                                               in VarMap.update (convert_loc s2) (update_option ([], new_val)) mem')
                       | _, _ -> update_mem exp mem)  
   | Le    (a1, a2) -> (match a1, a2 with
                       | Const n1, Const n2 -> mem (* bottom? or normal execution? *)
-                      | Const n, Var s -> 
-                        if not then execute_bexp (Le(Var s, Const(n-1))) mem false  
-                               else let new_iv = (handle_le (AbsMem.find s mem) n false) in VarMap.update s (update_option new_iv) mem 
-                      | Var s, Const n ->
-                        if not then execute_bexp (Le(Const(n+1), Var s)) mem false  
-                               else let new_iv = (handle_le (AbsMem.find s mem) n true) in VarMap.update s (update_option new_iv) mem
+                      | Const n, Lv s -> let s' = convert_loc s in 
+                        if not then execute_bexp (Le(a2, Const(n-1))) mem false  
+                               else let _, t1 = (AbsMem.find s' mem) in let new_iv = (handle_le t1 n false) in VarMap.update s' (update_option ([], new_iv)) mem 
+                      | Lv s, Const n -> let s' = convert_loc s in
+                        if not then execute_bexp (Le(Const(n+1), a1)) mem false  
+                               else let _, t1 = (AbsMem.find s' mem) in let new_iv = (handle_le t1 n true) in VarMap.update s' (update_option ([], new_iv)) mem
                       | _, _ -> update_mem exp mem)
   | Not   b        -> execute_bexp b mem (if not then false else true) (* then -> double negation. *)  
   | And   (b1, b2) -> if not then let mem' = execute_bexp b1 mem not in let mem'' = execute_bexp b2 mem not in AbsMem.join mem' mem''  
@@ -854,11 +862,11 @@ and update_mem : bexp -> AbsMem.t -> AbsMem.t
                       (let rcd = composition left a1 a2 true false mem mem in composition right a1 a2 false false mem rcd)
   | _ -> mem
 and update_aux : (exp * Value.t * bool) -> isEqual:bool -> mem:AbsMem.t -> (string * Value.t) 
-= fun (var, iv, isLeft) ~isEqual ~mem -> let name = (function | Var s -> s | _ -> raise (Failure "Error in name")) var in 
+= fun (var, iv, isLeft) ~isEqual ~mem -> let name = (function | Lv (Var s) -> s | _ -> raise (Failure "Error in name")) var in 
   if isEqual then (let temp = eq_aux name iv mem in (name, temp)) 
   else (let temp = le_aux name iv isLeft mem in (name, temp))   
 and eq_aux : string -> Value.t -> AbsMem.t -> Value.t
-= fun name iv mem -> let s_value = AbsMem.find name mem in match s_value, iv with 
+= fun name iv mem -> let (_, s_value) = AbsMem.find (BaseLoc.Var name) mem in match s_value, iv with 
   | Bot, _ -> Bot 
   | _, Bot -> Bot 
   | Top, b -> b 
@@ -866,7 +874,7 @@ and eq_aux : string -> Value.t -> AbsMem.t -> Value.t
   | a, b   -> Value.meet a b 
 (* need unit test. *)
 and le_aux : string -> Value.t -> bool -> AbsMem.t -> Value.t 
-= fun name iv isLeft mem -> let s_value = AbsMem.find name mem in 
+= fun name iv isLeft mem -> let (_, s_value) = AbsMem.find (BaseLoc.Var name) mem in 
     if isLeft then 
     (match (s_value, iv) with  
     | Bot, _ -> Bot
@@ -874,9 +882,10 @@ and le_aux : string -> Value.t -> bool -> AbsMem.t -> Value.t
     | Top, Top -> Top 
     | Top, Iv(a,b) -> Iv(N_inf, b) 
     | Iv(a,b), Top -> s_value 
-    | Iv(a1,a2), Iv(b1,b2) -> if not(Value.comp a1 b2) then Bot else (
+    | Iv(a1,a2), Iv(b1,b2) -> (if not(Value.comp a1 b2) then Bot else (
                               let new_a = a1 in  
                               let new_b = if (Value.comp a2 b2) then a2 else b2 in Iv(new_a, new_b)))
+    | _, _ -> raise (Failure "undefined"))
     else 
     (match (iv, s_value) with  
     | Bot, _ -> Bot
@@ -886,19 +895,21 @@ and le_aux : string -> Value.t -> bool -> AbsMem.t -> Value.t
     | Iv(a,b), Top -> Iv(a, P_inf) 
     | Iv(a1,a2), Iv(b1,b2) -> if not(Value.comp a1 b2) then Bot else (
                               let new_a = if (Value.comp a1 b1) then b1 else a1 in 
-                              let new_b = b2 in Iv(new_a, new_b)))
+                              let new_b = b2 in Iv(new_a, new_b))
+    | _, _ -> raise (Failure "undefined"))
 (* this func composes trans_aux with inter_execute *)
-and composition : exp list -> exp -> exp -> bool -> bool -> AbsMem.t -> AbsMem.t -> AbsMem.t 
-= fun lst left right isLeft isEqual mem rcd -> match lst with (* rcd means record. *) 
+and composition : exp list -> exp -> exp -> bool -> bool -> AbsMem.t -> AbsMem.t -> AbsMem.t -> AbsMem.t 
+= fun lst left right isLeft isEqual mem rcd adh -> match lst with (* rcd means record. *) 
   | hd::tl -> let (name, iv) = (trans_aux hd left right isLeft) |> (inter_execute ~mem:mem) |> (update_aux ~isEqual:isEqual ~mem:mem) in 
-              let rcd' = VarMap.update name (update_option iv) rcd in composition tl left right isLeft isEqual mem rcd'
+              let name' = BaseLoc.Var name in rcd 
+              (* let rcd' = VarMap.update name' (update_option iv) rcd in composition tl left right isLeft isEqual mem rcd' *)
   | _      -> rcd 
 (*right should be calculated more. then, need to applied to execute_aexp. *)
-and inter_execute : (exp * exp * bool) -> mem:AbsMem.t -> (exp * Value.t * bool)
-= fun (left, right, isLeft) ~mem -> let va = execute_aexp right mem in match left, right with (* left is the one should be updated. *) 
-  | Var s, _ -> (Var s, va, isLeft)  
-  | Mult (Var s, Const z), _ -> let divided = div_aux va z in (Var s, divided, isLeft)
-  | Mult (Const z, Var s), _ -> let divided = div_aux va z in (Var s, divided, isLeft)
+(*and inter_execute : (exp * exp * bool) -> mem:AbsMem.t -> (exp * Value.t * bool)
+= fun (left, right, isLeft) ~mem -> let va = execute_exp right mem in match left, right with (* left is the one should be updated. *) 
+  | Lv s, _ -> (Lv s, va, isLeft)  
+  | Mult (Lv s, Const z), _ -> let divided = div_aux va z in (Var s, divided, isLeft)
+  | Mult (Const z, Lv s), _ -> let divided = div_aux va z in (Var s, divided, isLeft)
   | _ -> raise (Failure "Error in inter execute: Impossible case.")
 and trans_aux : exp -> exp -> exp -> bool -> (exp * exp * bool) (* example of output, 2(x + z) = 4y + 8z => x = 2y + 6z. *)
 = fun var left right isLeft -> let name = (function | Var s -> s | _ -> raise (Failure "Error in name")) var in (* if isLeft is true, then position of var is left. otherwise, vars is located in right of exp. *)
@@ -952,7 +963,7 @@ and div_aux : Value.t -> int -> Value.t
     | Con a', P_inf    -> Value.Iv(Con (a' / div), b) 
     | Con a', Con b' -> let new_a = (a' / div) in let new_b = (b' / div) in let divided = Value.Iv(Con new_a, Con new_b) in 
                            (if ((new_a = new_b) && ((a' mod div) <> 0)) then Value.Bot else divided) 
-    | _ -> raise (Failure "Error in div_aux : Impossible cases "))
+    | _ -> raise (Failure "Error in div_aux : Impossible cases ")) *)
 (* check whether divided has at least one multiple of'div'. if not so, it's bottom. *) 
 
 (* consider relations between variables in eq, le. *)
@@ -1028,7 +1039,7 @@ let pgm1 =
 
 let pgm2 = 
   Seq [
-    Alloc (Lv(Var "p")); 
+    Alloc (Var "p"); 
     Assign ((Var "q"), Loc(Var "p"));
     Assign ((Ptr (Ptr (Var "q"))), Const 1)
   ]
