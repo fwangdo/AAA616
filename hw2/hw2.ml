@@ -272,8 +272,6 @@ end
 (* Added in hw2*)
 module BaseLoc = struct
   type t = 
-    | Bot
-    | Top
     | Var of string 
     | Allsite of int (* the number of node *) 
 
@@ -282,8 +280,6 @@ module BaseLoc = struct
 
   let to_string : t -> string 
   = fun a -> match a with 
-    | Bot       -> "Bot in location"
-    | Top       -> "Top in location"
     | Var s     -> "Var " ^ s 
     | Allsite i -> "Allsite " ^ string_of_int i 
 end
@@ -295,7 +291,6 @@ module type AbsLoc = sig
 
   val string_of_atom : BaseLoc.t -> string
   val to_string : t -> string -> string 
-  val bottom : BaseLoc.t 
 
   val order : t -> t -> bool 
   val join : t -> t -> t
@@ -311,8 +306,6 @@ module AbsLoc : AbsLoc = struct
   let compare = compare
   let string_of_atom : BaseLoc.t -> string 
   = fun a -> match a with 
-    | Bot       -> "Bot in location"
-    | Top       -> "Top in location"
     | Var s     -> "Var " ^ s 
     | Allsite i -> "Allsite " ^ string_of_int i 
 
@@ -320,7 +313,6 @@ module AbsLoc : AbsLoc = struct
   = fun lst str -> match lst with 
     | hd::tl -> let str' = str ^ ", " ^ string_of_atom hd in to_string tl str' 
     | _      -> str
-  let bottom = BaseLoc.Bot
 
   let rec order l1 l2 = match l1 with 
     | hd::tl -> if (List.mem hd l2) then order tl l2 else false 
@@ -772,6 +764,11 @@ let rec ptr_to_var : lv -> lv
   | Var _ -> lv
   | Ptr s -> ptr_to_var s
 
+let rec weak_update : BaseLoc.t list -> AbsMem.t -> AbsMem.value -> AbsMem.t
+= fun loc mem value -> match loc with 
+  | hd::tl -> let hd_mem: AbsMem.t = AbsMem.add hd value AbsMem.empty in let mem' = AbsMem.join hd_mem mem in weak_update tl mem' value  
+  | _      -> mem
+
 (* int is the number of node. *)
 let rec execute : int -> Node.instr -> AbsMem.t -> AbsMem.t
 = fun idx cmd mem -> match cmd with 
@@ -785,21 +782,19 @@ let rec execute : int -> Node.instr -> AbsMem.t -> AbsMem.t
                             let number_of_loc: int = List.length loc' in 
                             if number_of_loc = 1 
                             then VarMap.update (BaseLoc.Var s') (update_option a2') mem 
-                            else AbsMem.join   
+                            else weak_update loc' mem a2' 
   | I_skip     -> mem  
   | I_assume b -> execute_bexp b mem false  
   | I_alloc l  -> (* 1. Add new allocsite in l, 2. Add 0 in new location. *) 
-                  let zero     = Value.alpha 0 in 
-                  let addr     = Value.Allsite idx in 
-                  let mem'     = VarMap.update addr (update_option zero) mem in 
-                  (* let (loc', _) = mem' in  *)
-                  begin match l with 
-                    | Var s -> VarMap.update l (update_option addr) mem' 
-                    | Ptr p -> execute idx (I_alloc p) mem  
-                    end
-and execute_exp : exp -> AbsMem.t -> (AbsLoc.t * Value.t) 
+                  let zero: AbsMem.value = ([], Value.alpha 0) in 
+                  let addr: BaseLoc.t = BaseLoc.Allsite idx in 
+                  let addr': AbsMem.value = ([addr], Value.Bot) in 
+                  let loca: BaseLoc.t = convert_loc (ptr_to_var l) in
+                  let mem': AbsMem.t  = VarMap.update addr (update_option zero) mem in 
+                  let mem'': AbsMem.t = VarMap.update loca (update_option addr') mem' in mem'' 
+and execute_exp : exp -> AbsMem.t -> AbsMem.value 
 = fun exp mem -> match exp with 
-  | Const i       -> ([BaseLoc.Bot], Value.alpha i) 
+  | Const i       -> ([], Value.alpha i) 
   | Plus (a1, a2) -> Value.add (execute_exp a1 mem) (execute_exp a2 mem)
   | Mult (a1, a2) -> Value.mul (execute_exp a1 mem) (execute_exp a2 mem)
   | Sub  (a1, a2) -> Value.sub (execute_exp a1 mem) (execute_exp a2 mem)
