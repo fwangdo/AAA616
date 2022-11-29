@@ -954,7 +954,7 @@ let pgm3 =
         Assign ((Var "x"), Plus (Lv(Var "x"), Const 1)); 
       ]);
   ]
-let cfg = cmd2cfg pgm1
+let cfg = cmd2cfg pgm2
 let _ = Cfg.print cfg
 let _ = Cfg.dot cfg
 let table = analyze cfg 
