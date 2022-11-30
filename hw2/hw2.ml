@@ -785,9 +785,7 @@ let rec join_ptr : BaseLoc.t list -> AbsMem.t -> Value.t -> AbsMem.value
 (* int is the number of node. *)
 let rec execute : int -> Node.instr -> AbsMem.t -> AbsMem.t
 = fun idx cmd mem -> match cmd with 
-  | I_assign (Var s, a2) -> let s'  = BaseLoc.Var s in 
-                            let a2' = (execute_exp a2 mem) in 
-                            let loc', mem' = AbsMem.find s' mem in
+  | I_assign (Var s, a2) -> let a2' = (execute_exp a2 mem) in 
                             VarMap.update (BaseLoc.Var s) (update_option a2') mem 
   | I_assign (Ptr s, a2) -> let a2' = (execute_exp a2 mem) in 
                             let loc' = join_loc (-1) (Ptr s) mem in 
@@ -969,8 +967,21 @@ let pgm3 =
         Assign ((Var "x"), Plus (Lv(Var "x"), Const 1)); 
       ]);
   ]
-let cfg = cmd2cfg pgm1
-let _ = Cfg.print cfg
-let _ = Cfg.dot cfg
-let table = analyze cfg 
-let _ = Table.print table
+(* 
+let cfg1 = cmd2cfg pgm1
+let cfg2 = cmd2cfg pgm2 *)
+let cfg3 = cmd2cfg pgm3
+(* let _ = Cfg.print cfg *)
+(* let _ = Cfg.dot cfg *)
+
+(* let _ = print_endline "Program 1" 
+let table1 = analyze cfg1 
+let _ = Table.print table1
+
+let _ = print_endline "Program 2" 
+let table2 = analyze cfg2 
+let _ = Table.print table2 *)
+
+let _ = print_endline "Program 3" 
+let table3 = analyze cfg3 
+let _ = Table.print table3
