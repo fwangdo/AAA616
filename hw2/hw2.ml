@@ -313,7 +313,7 @@ module AbsLoc : AbsLoc = struct
   (* the first boolean argument is a flague to know whether it is the first to enter or not. *)
   let rec to_string : bool -> t -> string -> string
   = fun isFirst lst str -> match lst with 
-    | hd::tl -> let str' = str ^ ", " ^ string_of_atom hd in to_string false tl str' 
+    | hd::tl -> let str' = str ^ string_of_atom hd ^ "," in to_string false tl str' 
     | _      -> if isFirst then "Bottom" else str
 
   let rec order l1 l2 = match l1 with 
@@ -764,6 +764,11 @@ let rec weak_update : BaseLoc.t list -> AbsMem.t -> AbsMem.value -> AbsMem.t
   | hd::tl -> let hd_mem: AbsMem.t = AbsMem.add hd value AbsMem.empty in let mem' = AbsMem.join hd_mem mem in weak_update tl mem' value  
   | _      -> mem
 
+let rec join_ptr : BaseLoc.t list -> AbsMem.t -> Value.t -> AbsMem.value
+= fun loc mem value -> match loc with 
+  | hd::tl -> let (_, hd_val) = AbsMem.find hd mem in let new_val = Value.join hd_val value in join_ptr tl mem new_val 
+  | _      -> ([], value)
+
 (* int is the number of node. *)
 let rec execute : int -> Node.instr -> AbsMem.t -> AbsMem.t
 = fun idx cmd mem -> match cmd with 
@@ -796,9 +801,10 @@ and execute_exp : exp -> AbsMem.t -> AbsMem.value
                      ([], Value.mul  a1' a2')
   | Sub  (a1, a2) -> let _, a1' = (execute_exp a1 mem) in let _, a2' = (execute_exp a2 mem) in
                      ([], Value.sub a1' a2')
-  | Lv   (Ptr p)  -> execute_exp (Lv p) mem
-  | Lv   (Var s)  -> AbsMem.find (Var s) mem
-  | Loc  lv       -> AbsMem.find (convert_loc lv) mem 
+  | Lv   (Ptr p)  -> let s = ptr_to_var p in let s' = convert_loc s in let loc, mem' = AbsMem.find s' mem in join_ptr loc mem Value.bottom
+  | Lv   (Var s)  -> let s' = BaseLoc.Var s in AbsMem.find s' mem 
+  | Loc  (Var s)  -> ([BaseLoc.Var s], Value.Bot)
+  | Loc  _        -> raise (Failure "undefined") 
 (* this one will return memory itself.*)
 and execute_bexp : bexp -> AbsMem.t -> bool -> AbsMem.t
 = fun exp mem not -> match exp with (* n_not means the number of not *) 
@@ -951,7 +957,7 @@ let pgm3 =
         Assign ((Var "x"), Plus (Lv(Var "x"), Const 1)); 
       ]);
   ]
-let cfg = cmd2cfg pgm3
+let cfg = cmd2cfg pgm1
 let _ = Cfg.print cfg
 let _ = Cfg.dot cfg
 let table = analyze cfg 
