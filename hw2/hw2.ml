@@ -764,6 +764,19 @@ let rec weak_update : BaseLoc.t list -> AbsMem.t -> AbsMem.value -> AbsMem.t
   | hd::tl -> let hd_mem: AbsMem.t = AbsMem.add hd value AbsMem.empty in let mem' = AbsMem.join hd_mem mem in weak_update tl mem' value  
   | _      -> mem
 
+(* return ptr itself.*)
+let rec join_loc : int -> lv -> AbsMem.t -> AbsLoc.t
+= fun cnt lv mem -> match lv with
+  | Ptr p -> join_loc (cnt+1) p mem
+  | Var s -> let (loc', _) = AbsMem.find (BaseLoc.Var s) mem in loc_loop cnt loc' mem
+and loc_aux : AbsLoc.t -> AbsMem.t -> AbsLoc.t
+= fun lst mem -> match lst with                                 
+  | hd::tl -> let (cur, _) = AbsMem.find hd mem in cur@(loc_aux tl mem)  
+  | _      -> [] 
+and loc_loop : int -> AbsLoc.t -> AbsMem.t -> AbsLoc.t  
+= fun cnt lst mem -> if cnt = 0 then lst else loc_loop (cnt-1) (loc_aux lst mem) mem
+
+(* return joined value of ptr*)
 let rec join_ptr : BaseLoc.t list -> AbsMem.t -> Value.t -> AbsMem.value
 = fun loc mem value -> match loc with 
   | hd::tl -> let (_, hd_val) = AbsMem.find hd mem in let new_val = Value.join hd_val value in join_ptr tl mem new_val 
@@ -776,9 +789,8 @@ let rec execute : int -> Node.instr -> AbsMem.t -> AbsMem.t
                             let a2' = (execute_exp a2 mem) in 
                             let loc', mem' = AbsMem.find s' mem in
                             VarMap.update (BaseLoc.Var s) (update_option a2') mem 
-  | I_assign (Ptr s, a2) -> let var = convert_loc (ptr_to_var s) in let s' = get_loc var in (*Need to change *) 
-                            let a2' = (execute_exp a2 mem) in 
-                            let (loc', mem') = AbsMem.find var mem in 
+  | I_assign (Ptr s, a2) -> let a2' = (execute_exp a2 mem) in 
+                            let loc' = join_loc (-1) (Ptr s) mem in 
                             let number_of_loc = List.length loc' in 
                             if number_of_loc = 1 
                             then VarMap.update (List.hd loc') (update_option a2') mem 
