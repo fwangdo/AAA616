@@ -86,11 +86,11 @@ module Node : Node = struct
   let to_string n = 
     match n with
     | (id, I_assign (x, a)) -> 
-      string_of_int id ^ ": " ^ " " ^ string_of_lv x ^ " := " ^ string_of_exp a
+      string_of_int id ^ ": " ^  string_of_lv x ^ " := " ^ string_of_exp a
     | (id, I_assume b) -> 
       string_of_int id ^ ": " ^ "assume"  ^ " " ^ string_of_bexp b
     | (id, I_alloc lv) ->
-      string_of_int id ^ ": " ^ string_of_lv lv ^ "alloc" 
+      string_of_int id ^ ": " ^ string_of_lv lv ^ " := " ^ "alloc" 
     | (id, I_skip) -> 
       string_of_int id ^ ": " ^ "skip"
 end
@@ -290,7 +290,7 @@ module type AbsLoc = sig
   val compare : 'a -> 'a -> int
 
   val string_of_atom : BaseLoc.t -> string
-  val to_string : t -> string -> string 
+  val to_string : bool -> t -> string -> string 
 
   val order : t -> t -> bool 
   val join : t -> t -> t
@@ -304,15 +304,17 @@ module AbsLoc : AbsLoc = struct
   type t = BaseLoc.t list
 
   let compare = compare
+
   let string_of_atom : BaseLoc.t -> string 
   = fun a -> match a with 
     | Var s     -> "Var " ^ s 
     | Allsite i -> "Allsite " ^ string_of_int i 
 
-  let rec to_string : t -> string -> string
-  = fun lst str -> match lst with 
-    | hd::tl -> let str' = str ^ ", " ^ string_of_atom hd in to_string tl str' 
-    | _      -> str
+  (* the first boolean argument is a flague to know whether it is the first to enter or not. *)
+  let rec to_string : bool -> t -> string -> string
+  = fun isFirst lst str -> match lst with 
+    | hd::tl -> let str' = str ^ ", " ^ string_of_atom hd in to_string false tl str' 
+    | _      -> if isFirst then "Bottom" else str
 
   let rec order l1 l2 = match l1 with 
     | hd::tl -> if (List.mem hd l2) then order tl l2 else false 
@@ -606,7 +608,7 @@ module AbsMem : AbsMem = struct
   type t     = value VarMap.t 
 
   let print m = VarMap.iter (fun x (l, v) -> prerr_endline 
-    (BaseLoc.to_string x ^ " |-> " ^ (AbsLoc.to_string l "") ^ " | " ^ (Value.to_string v))) m 
+    (BaseLoc.to_string x ^ " |-> " ^ (AbsLoc.to_string true l "") ^ " | " ^ (Value.to_string v))) m 
 
   let empty = VarMap.empty
 
@@ -615,11 +617,6 @@ module AbsMem : AbsMem = struct
   let add x v m = VarMap.add x v m  
 
   let keys b = List.fold_right (fun (k,v) lst -> k::lst) b []
-
-  (* let debug : BaseLoc.t list -> BaseLoc.t -> BaseLoc.t 
-  = fun lst s -> match lst with 
-    | hd::_ -> s ^ hd  
-    | _ -> s *)
 
   let rec union_keys : BaseLoc.t list -> BaseLoc.t list -> BaseLoc.t list 
   = fun a b -> match b with 
@@ -774,12 +771,12 @@ let rec execute : int -> Node.instr -> AbsMem.t -> AbsMem.t
                             let a2' = (execute_exp a2 mem) in 
                             let loc', mem' = AbsMem.find s' mem in
                             VarMap.update (BaseLoc.Var s) (update_option a2') mem 
-  | I_assign (Ptr s, a2) -> let var = convert_loc (ptr_to_var s) in let s' = get_loc var in 
+  | I_assign (Ptr s, a2) -> let var = convert_loc (ptr_to_var s) in let s' = get_loc var in (*Need to change *) 
                             let a2' = (execute_exp a2 mem) in 
                             let (loc', mem') = AbsMem.find var mem in 
                             let number_of_loc = List.length loc' in 
                             if number_of_loc = 1 
-                            then VarMap.update (BaseLoc.Var s') (update_option a2') mem 
+                            then VarMap.update (List.hd loc') (update_option a2') mem 
                             else weak_update loc' mem a2' 
   | I_skip     -> mem  
   | I_assume b -> execute_bexp b mem false  
@@ -954,7 +951,7 @@ let pgm3 =
         Assign ((Var "x"), Plus (Lv(Var "x"), Const 1)); 
       ]);
   ]
-let cfg = cmd2cfg pgm2
+let cfg = cmd2cfg pgm3
 let _ = Cfg.print cfg
 let _ = Cfg.dot cfg
 let table = analyze cfg 
