@@ -1,8 +1,5 @@
 # Interval Analyzer
-
-📘 **고려대학교 AAA616 (Program Analysis) 수업 과제 구현물**  
-본 프로젝트는 고려대학교 대학원 **AAA616 프로그램 분석** 과목의 과제 구현물로,  
-**OCaml 기반 요약해석(Abstract Interpretation) 프레임워크**를 이용하여  
+**요약해석(Abstract Interpretation) 프레임워크**를 이용하여 
 **Interval Domain 기반의 정적 분석기(Interval Analyzer)** 를 구현하였습니다.
 
 ---
